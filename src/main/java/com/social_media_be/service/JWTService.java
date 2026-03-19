@@ -1,11 +1,9 @@
 package com.social_media_be.service;
 
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 
 
 public interface JWTService {
-    String generateToken(Authentication authentication);
 
     String generateToken(UserDetails userDetails);
 

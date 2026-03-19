@@ -3,11 +3,9 @@ package com.social_media_be.exception;
 
 import com.social_media_be.utils.ApiResponse;
 import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,31 +28,6 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    // ========== Authentication & Authorization Exceptions ==========
-
-//  @ExceptionHandler(ExpiredJwtException.class)
-//  public ResponseEntity<ApiResponse<Object>> handleExpiredJwtException(ExpiredJwtException ex) {
-//    ApiResponse<Object> errorResponse = ApiResponse.builder()
-//      .code(HttpServletResponse.SC_UNAUTHORIZED)
-//      .message("TOKEN_EXPIRED")
-//      .data("Your session has expired. Please log in again.")
-//      .build();
-//
-//    return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-//  }
-//
-//  // Bắt các lỗi Token sai định dạng, bị chỉnh sửa (SignatureException, MalformedJwtException...)
-//  @ExceptionHandler(JwtException.class)
-//  public ResponseEntity<ApiResponse<Object>> handleJwtException(JwtException ex) {
-//    ApiResponse<Object> errorResponse = ApiResponse.builder()
-//      .code(HttpServletResponse.SC_UNAUTHORIZED)
-//      .message("INVALID_TOKEN")
-//      .data("The provided token is invalid.")
-//      .build();
-//
-//    return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-//  }
 
     /**
      * Handle UsernameNotFoundException (User not found or disabled)

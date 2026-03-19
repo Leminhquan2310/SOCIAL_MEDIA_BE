@@ -2,6 +2,7 @@ package com.social_media_be.example;
 
 import com.social_media_be.entity.Role;
 import com.social_media_be.entity.User;
+import com.social_media_be.enums.AuthProvider;
 import com.social_media_be.enums.UserStatus;
 import com.social_media_be.repository.RoleRepository;
 import com.social_media_be.repository.UserRepository;
@@ -42,7 +43,7 @@ public class DataInitializer implements CommandLineRunner {
         .roles(Set.of(roleAdmin))
         .enabled(true)
         .status(UserStatus.PUBLIC)
-        .provider(User.AuthProvider.LOCAL)
+        .provider(AuthProvider.LOCAL)
         .fullName("Admin")
         .build();
 
@@ -56,7 +57,7 @@ public class DataInitializer implements CommandLineRunner {
         .email("nguyenvana@gmail.com")
         .password(passwordEncoder.encode("123456"))
         .roles(Set.of(roleUser))
-        .provider(User.AuthProvider.LOCAL)
+        .provider(AuthProvider.LOCAL)
         .enabled(true)
         .status(UserStatus.PUBLIC)
         .fullName("Nguyen Van A")

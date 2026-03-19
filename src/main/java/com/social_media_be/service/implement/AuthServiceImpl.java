@@ -137,12 +137,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public LogoutResponse logout(LogoutRequest logoutRequest) {
+    public void logout(LogoutRequest logoutRequest) {
         RefreshToken stored = refreshTokenService.findByToken(logoutRequest.getRefreshToken());
         refreshTokenRepository.delete(stored);
-
-        return LogoutResponse.builder()
-                .refreshToken(logoutRequest.getRefreshToken())
-                .build();
     }
 }

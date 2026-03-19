@@ -38,12 +38,6 @@ public class JWTServiceImpl implements JWTService {
   private long jwtExpirationMs;
 
   @Override
-  public String generateToken(Authentication authentication) {
-    UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-    return generateToken(userDetails);
-  }
-
-  @Override
   public String generateToken(UserDetails userDetails) {
     Map<String, Object> claims = new HashMap<>();
 

@@ -18,9 +18,11 @@ import java.util.stream.Collectors;
 public class UserPrincipal implements UserDetails, OAuth2User {
   private static final long serialVersionUID = 1L;
   private Long id;
+  private String fullName;
   private String username;
   private String password;
   private String email;
+  private boolean enabled;
 
   private Collection<? extends GrantedAuthority> roles;
   private Map<String, Object> attributes;
@@ -29,9 +31,11 @@ public class UserPrincipal implements UserDetails, OAuth2User {
     List<GrantedAuthority> authorities = user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList());
     return new UserPrincipal(
       user.getId(),
+      user.getFullName(),
       user.getUsername(),
       user.getPassword(),
       user.getEmail(),
+      user.isEnabled(),
       authorities,
       null
     );
@@ -41,9 +45,11 @@ public class UserPrincipal implements UserDetails, OAuth2User {
     UserPrincipal userPrincipal = UserPrincipal.build(user);
     return new UserPrincipal(
       userPrincipal.getId(),
+      userPrincipal.getFullName(),
       userPrincipal.getUsername(),
       userPrincipal.getPassword(),
       userPrincipal.getEmail(),
+      userPrincipal.isEnabled(),
       userPrincipal.getAuthorities(),
       attributes
     );
@@ -52,16 +58,12 @@ public class UserPrincipal implements UserDetails, OAuth2User {
 
   @Override
   public boolean isEnabled() {
-    return true;
+    return enabled;
   }
 
   @Override
   public String getName() {
-    return String.valueOf(id);
-  }
-
-  public Long getId() {
-    return id;
+    return fullName;
   }
 
   @Override

@@ -1,5 +1,6 @@
 package com.social_media_be.entity;
 
+import com.social_media_be.enums.AuthProvider;
 import com.social_media_be.enums.DisplayFriendsStatus;
 import com.social_media_be.enums.Gender;
 import com.social_media_be.enums.UserStatus;
@@ -109,15 +110,5 @@ public class User {
     if (status == null) {
       status = UserStatus.PUBLIC;
     }
-  }
-
-
-  // enum
-
-
-  public enum AuthProvider {
-    LOCAL,
-    GOOGLE,
-    FACEBOOK
   }
 }

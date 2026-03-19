@@ -24,8 +24,6 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
 
-
-
     @Value("${jwt.refresh-expiration}")
     private long refreshTokenDurationMs;
 
@@ -51,19 +49,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return refreshTokenRepository.save(refreshToken);
     }
 
-
-
     @Override
     public RefreshToken findByToken(String token) {
         return refreshTokenRepository.findByToken(token)
                 .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
-    }
-
-    @Override
-    @Transactional
-    public void deleteByUserId(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        refreshTokenRepository.deleteByUser(user);
     }
 }
