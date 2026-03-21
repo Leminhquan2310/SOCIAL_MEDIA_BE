@@ -7,6 +7,7 @@ import com.social_media_be.enums.UserStatus;
 import com.social_media_be.repository.RoleRepository;
 import com.social_media_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,8 @@ public class DataInitializer implements CommandLineRunner {
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
+  @Value("${app.avatar.default-url}")
+  private String avatarDefault;
 
   @Override
   public void run(String... args) {
@@ -39,6 +42,7 @@ public class DataInitializer implements CommandLineRunner {
       User admin = User.builder()
         .providerId("admin")
         .authProvider(AuthProvider.LOCAL)
+        .avatarUrl(avatarDefault)
         .email("admin@gmail.com")
         .password(passwordEncoder.encode("123456"))
         .roles(Set.of(roleAdmin))
@@ -56,6 +60,7 @@ public class DataInitializer implements CommandLineRunner {
         .providerId("nguyenvana")
         .authProvider(AuthProvider.LOCAL)
         .email("nguyenvana@gmail.com")
+        .avatarUrl(avatarDefault)
         .password(passwordEncoder.encode("123456"))
         .roles(Set.of(roleUser))
         .enabled(true)

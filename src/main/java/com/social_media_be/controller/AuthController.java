@@ -3,6 +3,7 @@ package com.social_media_be.controller;
 import com.social_media_be.dto.auth.*;
 import com.social_media_be.entity.UserPrincipal;
 import com.social_media_be.service.AuthService;
+import com.social_media_be.service.UserService;
 import com.social_media_be.utils.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
 
 import lombok.extern.slf4j.Slf4j; // Thêm import
 
@@ -23,17 +21,16 @@ import lombok.extern.slf4j.Slf4j; // Thêm import
 public class AuthController {
 
   private final AuthService authService;
+  private final UserService userService;
 
   @GetMapping("/me")
   public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserPrincipal userPrincipal) {
-    Map<String, Object> userInfo = new HashMap<>();
+    UserProfileResponse profileResponse =
+            UserProfileResponse.fromEntity(userService.findByUserId(userPrincipal.getId()));
 
-    userInfo.put("id", userPrincipal.getId());
-    userInfo.put("email", userPrincipal.getEmail());
-    userInfo.put("name", userPrincipal.getName());
-
-    return ResponseEntity.ok(ApiResponse.success(userInfo));
+    return ResponseEntity.ok(ApiResponse.success(profileResponse));
   }
+
 
   @PostMapping("/register")
   public ResponseEntity<ApiResponse<RegisterResponse>> register(
