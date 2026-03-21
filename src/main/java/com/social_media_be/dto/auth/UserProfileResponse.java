@@ -1,10 +1,10 @@
 package com.social_media_be.dto.auth;
 
 import com.social_media_be.entity.User;
-import com.social_media_be.enums.AuthProvider;
-import com.social_media_be.enums.DisplayFriendsStatus;
-import com.social_media_be.enums.Gender;
-import com.social_media_be.enums.UserStatus;
+import com.social_media_be.entity.enums.AuthProvider;
+import com.social_media_be.entity.enums.DisplayFriendsStatus;
+import com.social_media_be.entity.enums.Gender;
+import com.social_media_be.entity.enums.UserStatus;
 import lombok.Builder;
 import lombok.Getter;
 

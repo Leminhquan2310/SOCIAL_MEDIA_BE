@@ -1,6 +1,6 @@
 package com.social_media_be.dto.user;
 
-import com.social_media_be.enums.Gender;
+import com.social_media_be.entity.enums.Gender;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;

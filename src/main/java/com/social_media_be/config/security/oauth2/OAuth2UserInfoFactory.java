@@ -1,6 +1,6 @@
 package com.social_media_be.config.security.oauth2;
 
-import com.social_media_be.enums.AuthProvider;
+import com.social_media_be.entity.enums.AuthProvider;
 
 import java.util.Map;
 

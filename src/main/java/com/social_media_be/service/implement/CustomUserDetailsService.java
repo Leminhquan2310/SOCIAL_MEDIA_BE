@@ -2,6 +2,7 @@ package com.social_media_be.service.implement;
 
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.UserPrincipal;
+import com.social_media_be.entity.enums.AuthProvider;
 import com.social_media_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional(readOnly = true)
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, username)
+        User user = userRepository.findByAuthProviderAndProviderId(AuthProvider.LOCAL, username)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "User not found with identify: " + username
                 ));

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
-import com.social_media_be.enums.AuthProvider;
+import com.social_media_be.entity.enums.AuthProvider;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {

@@ -2,8 +2,8 @@ package com.social_media_be.example;
 
 import com.social_media_be.entity.Role;
 import com.social_media_be.entity.User;
-import com.social_media_be.enums.AuthProvider;
-import com.social_media_be.enums.UserStatus;
+import com.social_media_be.entity.enums.AuthProvider;
+import com.social_media_be.entity.enums.UserStatus;
 import com.social_media_be.repository.RoleRepository;
 import com.social_media_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
