@@ -88,11 +88,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         CookieUtils.addCookie(response, "refreshToken", refreshTokenString, cookieMaxAge);
 
         log.info("OAuth2 login successful for user: {}, provider: {}",
-                user.getEmail(), user.getProvider());
+                user.getEmail(), user.getAuthProvider());
 
-        // ✅ TRẢ VỀ CHỈ ACCESS TOKEN (Refresh Token đã nằm trong Cookie)
+        // ✅ CHỈ REDIRECT VỀ TARGET URL (Token đã nằm trong Cookie)
+        // Frontend sẽ tự động gọi Silent Refresh để lấy Access Token sau khi redirect
         return UriComponentsBuilder.fromUriString(targetUrl)
-                .queryParam("accessToken", accessToken)
                 .build().toUriString();
     }
 

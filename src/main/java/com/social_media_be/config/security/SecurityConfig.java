@@ -80,7 +80,7 @@ public class SecurityConfig {
 
         // Allowed origins
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000"
+                "https://localhost:3000"
         ));
 
         // Allowed methods

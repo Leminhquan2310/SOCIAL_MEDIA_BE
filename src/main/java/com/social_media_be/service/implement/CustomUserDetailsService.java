@@ -20,12 +20,26 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional(readOnly = true)
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsernameOrEmail(username, username)
+        User user = userRepository.findByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, username)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "User not found with identify: " + username
                 ));
 
         // Check if user is enabled
+        if (!user.isEnabled()) {
+            throw new UsernameNotFoundException("User account is disabled");
+        }
+
+        return UserPrincipal.build(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserDetails loadUserById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException(
+                        "User not found with id: " + id
+                ));
+
         if (!user.isEnabled()) {
             throw new UsernameNotFoundException("User account is disabled");
         }

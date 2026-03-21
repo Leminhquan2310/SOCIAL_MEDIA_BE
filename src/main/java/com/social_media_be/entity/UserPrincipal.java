@@ -32,7 +32,7 @@ public class UserPrincipal implements UserDetails, OAuth2User {
     return new UserPrincipal(
       user.getId(),
       user.getFullName(),
-      user.getUsername(),
+      user.getProviderId(),
       user.getPassword(),
       user.getEmail(),
       user.isEnabled(),

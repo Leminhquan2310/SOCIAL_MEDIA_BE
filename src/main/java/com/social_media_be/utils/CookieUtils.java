@@ -31,7 +31,7 @@ public class CookieUtils {
       .path("/")
       .httpOnly(true)
       .maxAge(maxAge)
-      .sameSite("Lax") // Quan trọng cho cross-origin localhost
+      .sameSite("Lax") // Cho phép gửi trên cùng domain localhost:3000 -> localhost:8080
       .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
   }
@@ -47,7 +47,6 @@ public class CookieUtils {
             .httpOnly(true)
             .maxAge(0)
             .sameSite("Lax")
-            // .secure(true) // Chỉ bật nếu môi trường Production có HTTPS (nếu chạy localhost FE dev có thể gây lỗi)
             .build();
           response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
         }

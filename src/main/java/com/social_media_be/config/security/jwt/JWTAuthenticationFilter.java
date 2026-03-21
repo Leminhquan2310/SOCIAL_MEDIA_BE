@@ -11,7 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import com.social_media_be.service.implement.CustomUserDetailsService;
+
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -28,7 +29,8 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final JWTService jwtService;
-  private final UserDetailsService userDetailsService;
+  private final CustomUserDetailsService customUserDetailsService;
+
 
   @Override
   protected void doFilterInternal(
@@ -40,11 +42,11 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
       String jwt = extractJwtFromRequest(request);
 
       if (StringUtils.hasText(jwt)) {
-        // ✅ Bắt riêng ExpiredJwtException để trả lỗi rõ ràng
-        String username = jwtService.getUsernameFromToken(jwt); // throws ExpiredJwtException nếu hết hạn
+        // ✅ Decode userId directly
+        Long userId = jwtService.getUserIdFromToken(jwt);
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-          UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+          UserDetails userDetails = customUserDetailsService.loadUserById(userId);
           if (jwtService.validateToken(jwt, userDetails)) {
             authenticateUser(userDetails, request);
           }

@@ -27,8 +27,8 @@ public class AuthController {
   @GetMapping("/me")
   public ResponseEntity<?> getCurrentUser(@AuthenticationPrincipal UserPrincipal userPrincipal) {
     Map<String, Object> userInfo = new HashMap<>();
+
     userInfo.put("id", userPrincipal.getId());
-    userInfo.put("username", userPrincipal.getUsername());
     userInfo.put("email", userPrincipal.getEmail());
     userInfo.put("name", userPrincipal.getName());
 
@@ -72,6 +72,10 @@ public class AuthController {
     }
 
     RefreshTokenResponse tokenResponse = authService.refreshToken(token);
+    
+    // Cập nhật Refresh Token mới vào Cookie (Rotation)
+    addRefreshTokenCookie(response, tokenResponse.getRefreshToken());
+    
     return ResponseEntity.ok(ApiResponse.success(tokenResponse));
   }
 

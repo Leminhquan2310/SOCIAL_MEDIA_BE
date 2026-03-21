@@ -56,14 +56,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             throw new OAuth2AuthenticationProcessingException("Email not found from OAuth2 provider");
         }
 
-        Optional<User> userOptional = userRepository.findByEmail(oAuth2UserInfo.getEmail());
+        AuthProvider authProvider = AuthProvider.valueOf(registrationId.toUpperCase());
+        String providerId = oAuth2UserInfo.getId();
+        Optional<User> userOptional = userRepository.findByAuthProviderAndProviderId(authProvider, providerId);
         User user;
 
         if (userOptional.isPresent()) {
             user = userOptional.get();
-            // ✅ AUTO-LINK: Cập nhật provider nếu khác biệt (Trust provider)
-            user.setProvider(AuthProvider.valueOf(registrationId.toUpperCase()));
-            user.setProviderId(oAuth2UserInfo.getId());
             user = updateExistingUser(user, oAuth2UserInfo);
         } else {
             user = registerNewUser(userRequest, oAuth2UserInfo);
@@ -81,27 +80,23 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         Set<Role> roles = new HashSet<>();
         roles.add(roleUser);
 
-        // ✅ GENERATE USERNAME TỪ EMAIL
-        String username = generateUsername(oAuth2UserInfo.getEmail());
 
         User user = User.builder()
-                .username(username)  // ✅ THÊM USERNAME
+                .authProvider(AuthProvider.valueOf(
+                        userRequest.getClientRegistration().getRegistrationId().toUpperCase()
+                ))
+                .providerId(oAuth2UserInfo.getId())
                 .fullName(oAuth2UserInfo.getName())
                 .email(oAuth2UserInfo.getEmail())
                 .avatarUrl(StringUtils.hasText(oAuth2UserInfo.getImageUrl())
                         ? oAuth2UserInfo.getImageUrl()
-                        : defaultAvatarUrl)  // ✅ FALLBACK TO DEFAULT
-                .provider(AuthProvider.valueOf(
-                        userRequest.getClientRegistration().getRegistrationId().toUpperCase()
-                ))
-                .providerId(oAuth2UserInfo.getId())
+                         : defaultAvatarUrl)
                 .roles(roles)
-                .emailVerified(true)
-                .enabled(true)  // ✅ THÊM enabled = true
+                .enabled(true)
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("New OAuth2 user registered: {} ({})", savedUser.getUsername(), savedUser.getProvider());
+        log.info("New OAuth2 user registered: {} ({})", savedUser.getProviderId(), savedUser.getAuthProvider());
 
         return savedUser;
     }
@@ -129,29 +124,4 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return existingUser;
     }
 
-    /**
-     * ✅ GENERATE UNIQUE USERNAME TỪ EMAIL
-     */
-    private String generateUsername(String email) {
-        String baseUsername = email.split("@")[0].toLowerCase();
-
-        // Remove special characters
-        baseUsername = baseUsername.replaceAll("[^a-z0-9_]", "");
-
-        // Ensure minimum length
-        if (baseUsername.length() < 3) {
-            baseUsername = "user_" + baseUsername;
-        }
-
-        String username = baseUsername;
-        int counter = 1;
-
-        // Find unique username
-        while (userRepository.existsByUsername(username)) {
-            username = baseUsername + counter;
-            counter++;
-        }
-
-        return username;
-    }
 }

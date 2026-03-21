@@ -35,15 +35,15 @@ public class DataInitializer implements CommandLineRunner {
       ));
 
     // 2. Create admin user if not exist
-    if (!userRepository.existsByUsername("admin")) {
+    if (!userRepository.existsByAuthProviderAndProviderId(AuthProvider.LOCAL, "admin")) {
       User admin = User.builder()
-        .username("admin")
+        .providerId("admin")
+        .authProvider(AuthProvider.LOCAL)
         .email("admin@gmail.com")
         .password(passwordEncoder.encode("123456"))
         .roles(Set.of(roleAdmin))
         .enabled(true)
         .status(UserStatus.PUBLIC)
-        .provider(AuthProvider.LOCAL)
         .fullName("Admin")
         .build();
 
@@ -51,13 +51,13 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     // 2. Create user test if not exist
-    if (!userRepository.existsByUsername("nguyenvana")) {
+    if (!userRepository.existsByAuthProviderAndProviderId(AuthProvider.LOCAL, "nguyenvana")) {
       User user = User.builder()
-        .username("nguyenvana")
+        .providerId("nguyenvana")
+        .authProvider(AuthProvider.LOCAL)
         .email("nguyenvana@gmail.com")
         .password(passwordEncoder.encode("123456"))
         .roles(Set.of(roleUser))
-        .provider(AuthProvider.LOCAL)
         .enabled(true)
         .status(UserStatus.PUBLIC)
         .fullName("Nguyen Van A")

@@ -16,9 +16,11 @@ import java.util.Set;
 
 @Entity
 @Table(name = "users",
+  uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"auth_provider", "provider_id"})
+  },
   indexes = {
-    @Index(name = "IDX_USER_PROVIDER", columnList = "provider"),
-    @Index(name = "IDX_USER_PROVIDER_ID", columnList = "provider_id")
+    @Index(name = "IDX_USER_PROVIDER_ID", columnList = "auth_provider, provider_id")
   }
 )
 @Getter
@@ -31,15 +33,7 @@ public class User {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  @Column(
-    name = "username"
-    , unique = true
-    , nullable = false
-    , length = 50
-    , updatable = false)
-  private String username;
-
-  @Column(name = "password", nullable = true)
+  @Column(name = "password")
   private String password;
 
   @ManyToMany(fetch = FetchType.EAGER)
@@ -55,7 +49,7 @@ public class User {
   @Column(name = "full_name", length = 100)
   private String fullName;
 
-  @Column(name = "email", unique = true, nullable = true, length = 100)
+  @Column(name = "email", length = 100)
   private String email;
 
   @Column(name = "address", columnDefinition = "TEXT")
@@ -93,12 +87,11 @@ public class User {
   private DisplayFriendsStatus displayFriendsStatus = DisplayFriendsStatus.PUBLIC;
 
   @Enumerated(EnumType.STRING)
-  private AuthProvider provider;
+  @Column(name = "auth_provider", nullable = false)
+  private AuthProvider authProvider;
 
-  @Column(name = "provider_id", nullable = true)
+  @Column(name = "provider_id", nullable = false)
   private String providerId;
-
-  private Boolean emailVerified = false;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;

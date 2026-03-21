@@ -51,16 +51,13 @@ public class AuthServiceImpl implements AuthService {
     public RegisterResponse register(RegisterRequest request) {
         log.info("Registering new user: {}", request.getUsername());
 
-        if (userRepository.existsByUsername(request.getUsername())) {
+        if (userRepository.existsByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, request.getUsername())) {
             throw new BadRequestException("Username is already taken");
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email is already in use");
-        }
-
         User user = new User();
-        user.setUsername(request.getUsername());
+        user.setAuthProvider(com.social_media_be.enums.AuthProvider.LOCAL);
+        user.setProviderId(request.getUsername());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());
@@ -74,11 +71,11 @@ public class AuthServiceImpl implements AuthService {
         user.setRoles(roles);
 
         User savedUser = userRepository.save(user);
-        log.info("User registered successfully: {}", savedUser.getUsername());
+        log.info("User registered successfully: {}", savedUser.getProviderId());
 
         return RegisterResponse.builder()
                 .id(savedUser.getId())
-                .username(savedUser.getUsername())
+                .username(savedUser.getProviderId())
                 .email(savedUser.getEmail())
                 .fullName(savedUser.getFullName())
                 .message("User registered successfully")
@@ -99,7 +96,7 @@ public class AuthServiceImpl implements AuthService {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-        User user = userRepository.findByUsername(userDetails.getUsername())
+        User user = userRepository.findByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String accessToken = jwtService.generateToken(userDetails);
@@ -114,22 +111,35 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public RefreshTokenResponse refreshToken(String refreshToken) {
         log.info("Refreshing token");
 
         RefreshToken stored = refreshTokenService.findByToken(refreshToken);
 
         if (stored.isRevoked() || stored.getExpiryDate().isBefore(java.time.Instant.now())) {
+            // Nếu RT đã bị hủy hoặc hết hạn, ném lỗi
             throw new BadRequestException("Refresh token expired or revoked");
         }
 
+        // --- BẮT ĐẦU REFRESH TOKEN ROTATION ---
         User user = stored.getUser();
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
-
+        
+        // 1. Xóa (hoặc hủy) token cũ ngay lập tức sau khi dùng
+        refreshTokenRepository.delete(stored);
+        
+        // 2. Tạo Refresh Token mới cho lần kế tiếp
+        RefreshToken newRefreshTokenObj = refreshTokenService.createRefreshToken(user.getId());
+        
+        // 3. Tạo Access Token mới
+        UserDetails userDetails = ((com.social_media_be.service.implement.CustomUserDetailsService) userDetailsService).loadUserById(user.getId());
         String newAccessToken = jwtService.generateToken(userDetails);
+
+        log.info("Token rotated successfully for user: {}", user.getProviderId());
 
         return RefreshTokenResponse.builder()
                 .accessToken(newAccessToken)
+                .refreshToken(newRefreshTokenObj.getToken())
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getExpirationTime(newAccessToken))
                 .build();
