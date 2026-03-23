@@ -4,6 +4,7 @@ import com.social_media_be.dto.auth.*;
 import com.social_media_be.entity.RefreshToken;
 import com.social_media_be.entity.Role;
 import com.social_media_be.entity.User;
+import com.social_media_be.entity.enums.AuthProvider;
 import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.RefreshTokenRepository;
@@ -51,12 +52,12 @@ public class AuthServiceImpl implements AuthService {
     public RegisterResponse register(RegisterRequest request) {
         log.info("Registering new user: {}", request.getUsername());
 
-        if (userRepository.existsByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, request.getUsername())) {
+        if (userRepository.existsByAuthProviderAndProviderId(AuthProvider.LOCAL, request.getUsername())) {
             throw new BadRequestException("Username is already taken");
         }
 
         User user = new User();
-        user.setAuthProvider(com.social_media_be.enums.AuthProvider.LOCAL);
+        user.setAuthProvider(AuthProvider.LOCAL);
         user.setProviderId(request.getUsername());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -96,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
 
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-        User user = userRepository.findByAuthProviderAndProviderId(com.social_media_be.enums.AuthProvider.LOCAL, userDetails.getUsername())
+        User user = userRepository.findByAuthProviderAndProviderId(AuthProvider.LOCAL, userDetails.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String accessToken = jwtService.generateToken(userDetails);
