@@ -8,12 +8,10 @@ import com.social_media_be.dto.user.UserSummary;
 import com.social_media_be.entity.Post;
 import com.social_media_be.entity.PostImage;
 import com.social_media_be.entity.User;
-import com.social_media_be.entity.enums.AuthProvider;
 import com.social_media_be.entity.enums.FriendStatus;
 import com.social_media_be.entity.enums.Privacy;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.FriendshipRepository;
-import com.social_media_be.repository.PostImageRepository;
 import com.social_media_be.repository.PostRepository;
 import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.CloudinaryService;
@@ -39,7 +37,6 @@ import java.util.stream.Collectors;
 public class PostServiceImpl implements PostService {
 
     private final PostRepository postRepository;
-    private final PostImageRepository postImageRepository;
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final CloudinaryService cloudinaryService;
@@ -57,6 +54,11 @@ public class PostServiceImpl implements PostService {
                 .build();
 
         List<PostImageDto> imageDtos = post.getImages().stream()
+                .sorted((a, b) -> {
+                    int idxA = a.getOrderIndex() != null ? a.getOrderIndex() : 0;
+                    int idxB = b.getOrderIndex() != null ? b.getOrderIndex() : 0;
+                    return Integer.compare(idxA, idxB);
+                })
                 .map(img -> PostImageDto.builder()
                         .id(img.getId())
                         .imageUrl(img.getImageUrl())
@@ -95,7 +97,7 @@ public class PostServiceImpl implements PostService {
             int order = 0;
             try {
                 for (MultipartFile file : request.getImages()) {
-                    Map uploadResult = cloudinaryService.upload(file, "social-media/posts");
+                    Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file, "social-media/posts");
                     String imgUrl = (String) uploadResult.get("url");
                     PostImage postImage = PostImage.builder()
                             .post(post)
@@ -154,27 +156,102 @@ public class PostServiceImpl implements PostService {
         }
 
         if (request.getNewImages() != null && !request.getNewImages().isEmpty()) {
-            int maxOrder = post.getImages().stream().mapToInt(PostImage::getOrderIndex).max().orElse(-1);
-            try {
-                for (MultipartFile file : request.getNewImages()) {
-                    Map uploadResult = cloudinaryService.upload(file, "social-media/posts");
+            List<PostImage> newlyUploaded = new ArrayList<>();
+            for (MultipartFile file : request.getNewImages()) {
+                validateImage(file);
+                try {
+                    Map<?, ?> uploadResult = cloudinaryService.upload(file, "social-media/posts");
                     String imgUrl = (String) uploadResult.get("url");
                     PostImage postImage = PostImage.builder()
                             .post(post)
                             .imageUrl(imgUrl)
-                            .orderIndex(++maxOrder)
+                            .orderIndex(0) // Will be updated by reordering logic
                             .build();
-                    post.getImages().add(postImage);
+                    newlyUploaded.add(postImage);
+                } catch (IOException ioe) {
+                    log.error("Can not upload file!");
+                    throw new RuntimeException("Failed to upload image", ioe);
                 }
-            } catch (IOException ioe) {
-                log.error("Can not upload file!");
-                ioe.printStackTrace();
+            }
+            post.getImages().addAll(newlyUploaded);
+        }
+
+        // Handle Reordering and New Image Integration
+        if (request.getImageOrder() != null && !request.getImageOrder().isEmpty()) {
+            List<PostImage> currentImages = post.getImages();
+            
+            // To track which new image is which: filter those without ID (newly added at line 171)
+            List<PostImage> newAddedImages = currentImages.stream()
+                .filter(img -> img.getId() == null)
+                .collect(Collectors.toList());
+
+            // Build the final set of images that should remain
+            List<PostImage> orderedList = new ArrayList<>();
+            for (int i = 0; i < request.getImageOrder().size(); i++) {
+                String ref = request.getImageOrder().get(i);
+                final int finalI = i;
+
+                if (ref.startsWith("new-")) {
+                    try {
+                        int subIdx = Integer.parseInt(ref.substring(4));
+                        if (subIdx < newAddedImages.size()) {
+                            PostImage img = newAddedImages.get(subIdx);
+                            img.setOrderIndex(finalI);
+                            orderedList.add(img);
+                        }
+                    } catch (NumberFormatException ignored) {}
+                } else {
+                    try {
+                        Long id = Long.parseLong(ref);
+                        currentImages.stream()
+                            .filter(img -> img.getId() != null && img.getId().equals(id))
+                            .findFirst()
+                            .ifPresent(img -> {
+                                img.setOrderIndex(finalI);
+                                orderedList.add(img);
+                            });
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            
+            // Safety check: Keep any existing images that weren't in the ordering list but weren't marked for deletion
+            for (PostImage img : currentImages) {
+                if (!orderedList.contains(img)) {
+                    img.setOrderIndex(orderedList.size());
+                    orderedList.add(img);
+                }
             }
 
+            // Robust collection update for JPA orphanRemoval
+            // Instead of setImages(newList), we modify the existing managed collection
+            List<PostImage> toRemove = currentImages.stream()
+                .filter(img -> !orderedList.contains(img))
+                .collect(Collectors.toList());
+            currentImages.removeAll(toRemove);
+            
+            // Add any that are in orderedList but not in currentImages (should be none because we added them all at 171)
+            // But we actually want to ensure the orderIndex is updated. The objects are the same, so it's already updated.
         }
 
         Post savedPost = postRepository.save(post);
         return mapToResponse(savedPost);
+    }
+
+    private void validateImage(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Image file is empty");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("image/jpeg") && 
+                                   !contentType.equals("image/png") && 
+                                   !contentType.equals("image/webp"))) {
+            throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
+        }
+        // Optional: check file extension too
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.matches("(?i).*\\.(jpg|jpeg|png|webp)$")) {
+            throw new IllegalArgumentException("Invalid image file extension.");
+        }
     }
 
     @Override

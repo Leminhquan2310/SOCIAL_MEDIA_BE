@@ -14,4 +14,5 @@ public class PostUpdateRequest {
     private String feeling;
     private List<Long> deletedImageIds = new ArrayList<>();
     private List<MultipartFile> newImages = new ArrayList<>();
+    private List<String> imageOrder = new ArrayList<>();
 }

@@ -4,7 +4,6 @@ import com.social_media_be.dto.post.PostCreateRequest;
 import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.post.PostUpdateRequest;
 
-import java.io.IOException;
 import java.util.List;
 
 public interface PostService {

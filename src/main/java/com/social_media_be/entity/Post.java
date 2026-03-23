@@ -36,6 +36,7 @@ public class Post {
     private Privacy privacy = Privacy.PUBLIC;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
     @Builder.Default
     private List<PostImage> images = new ArrayList<>();
 
