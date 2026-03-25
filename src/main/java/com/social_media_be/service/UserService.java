@@ -7,6 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 public interface UserService {
     User findByUserId(Long id);
 
+    User findByUsername(String username);
+
     User updateProfile(Long userId, UpdateProfileRequest request);
 
     String updateAvatar(Long userId, MultipartFile file);

@@ -49,6 +49,7 @@ public class PostServiceImpl implements PostService {
     private PostResponse mapToResponse(Post post) {
         UserSummary author = UserSummary.builder()
                 .id(post.getUser().getId())
+                .username(post.getUser().getUsername())
                 .fullName(post.getUser().getFullName())
                 .avatarUrl(post.getUser().getAvatarUrl())
                 .build();

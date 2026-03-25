@@ -31,11 +31,12 @@ public class UserProfileResponse {
     private AuthProvider authProvider;
     private LocalDateTime createdAt;
     private Set<String> roles;
+    private Integer mutualFriends;
 
     public static UserProfileResponse fromEntity(User user) {
         return UserProfileResponse.builder()
                 .id(user.getId())
-                .username(user.getProviderId())
+                .username(user.getUsername())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())

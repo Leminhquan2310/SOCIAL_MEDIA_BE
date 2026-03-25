@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class UserSummary {
     private Long id;
+    private String username;
     private String fullName;
     private String avatarUrl;
 }
