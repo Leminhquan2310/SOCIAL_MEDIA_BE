@@ -86,6 +86,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                         userRequest.getClientRegistration().getRegistrationId().toUpperCase()
                 ))
                 .providerId(oAuth2UserInfo.getId())
+                .username(generateUniqueUsername(oAuth2UserInfo.getName()))
                 .fullName(oAuth2UserInfo.getName())
                 .email(oAuth2UserInfo.getEmail())
                 .avatarUrl(StringUtils.hasText(oAuth2UserInfo.getImageUrl())
@@ -96,9 +97,40 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("New OAuth2 user registered: {} ({})", savedUser.getProviderId(), savedUser.getAuthProvider());
+        log.info("New OAuth2 user registered: {} ({}) with username: {}", savedUser.getProviderId(), savedUser.getAuthProvider(), savedUser.getUsername());
 
         return savedUser;
+    }
+
+    private String generateUniqueUsername(String fullName) {
+        if (!StringUtils.hasText(fullName)) {
+            fullName = "user";
+        }
+        
+        // Convert to lowercase, remove non-alphanumeric, and remove Vietnamese accents
+        String base = fullName.toLowerCase()
+                .replaceAll("đ", "d")
+                .replaceAll("[àáạảãâầấậẩẫăằắặẳẵ]", "a")
+                .replaceAll("[èéẹẻẽêềếệểễ]", "e")
+                .replaceAll("[ìíịỉĩ]", "i")
+                .replaceAll("[òóọỏõôồốộổỗơờớợởỡ]", "o")
+                .replaceAll("[ùúụủũưừứựửữ]", "u")
+                .replaceAll("[ỳýỵỷỹ]", "y")
+                .replaceAll("[^a-z0-9]", "");
+        
+        if (base.isEmpty()) base = "user";
+
+        String username = base;
+        int maxAttempts = 10;
+        int attempts = 0;
+        
+        while (userRepository.existsByUsername(username) && attempts < maxAttempts) {
+            String suffix = UUID.randomUUID().toString().substring(0, 4);
+            username = base + "_" + suffix;
+            attempts++;
+        }
+        
+        return username;
     }
 
     private User updateExistingUser(User existingUser, OAuth2UserInfo oAuth2UserInfo) {

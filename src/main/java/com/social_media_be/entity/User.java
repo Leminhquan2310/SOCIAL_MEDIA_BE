@@ -42,6 +42,9 @@ public class User {
     inverseJoinColumns = {@JoinColumn(name = "role_id")})
   private Set<Role> roles;
 
+  @Column(name = "username", unique = true, length = 50)
+  private String username;
+
   @Builder.Default
   @Column(name = "enabled", nullable = false)
   private boolean enabled = true;

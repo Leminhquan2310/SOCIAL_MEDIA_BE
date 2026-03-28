@@ -30,6 +30,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+    }
+
+    @Override
     @Transactional
     public User updateProfile(Long userId, UpdateProfileRequest request) {
         User user = findByUserId(userId);
@@ -60,7 +66,7 @@ public class UserServiceImpl implements UserService {
             }
 
             Map uploadResult = cloudinaryService.upload(file, "social-media/avatars");
-            String avatarUrl = (String) uploadResult.get("url");
+            String avatarUrl = (String) uploadResult.get("secure_url");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
             return avatarUrl;

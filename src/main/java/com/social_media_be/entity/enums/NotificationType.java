@@ -5,5 +5,6 @@ public enum NotificationType {
     LIKE_COMMENT,
     COMMENT_POST,
     REPLY_COMMENT,
-    FRIEND_REQUEST
+    FRIEND_REQUEST,
+    FRIEND_ACCEPT
 }

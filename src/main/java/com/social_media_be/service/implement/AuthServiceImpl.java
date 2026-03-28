@@ -52,13 +52,14 @@ public class AuthServiceImpl implements AuthService {
     public RegisterResponse register(RegisterRequest request) {
         log.info("Registering new user: {}", request.getUsername());
 
-        if (userRepository.existsByAuthProviderAndProviderId(AuthProvider.LOCAL, request.getUsername())) {
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new BadRequestException("Username is already taken");
         }
 
         User user = new User();
         user.setAuthProvider(AuthProvider.LOCAL);
         user.setProviderId(request.getUsername());
+        user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setFullName(request.getFullName());

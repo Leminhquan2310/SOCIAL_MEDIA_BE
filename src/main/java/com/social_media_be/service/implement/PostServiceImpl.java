@@ -49,6 +49,7 @@ public class PostServiceImpl implements PostService {
     private PostResponse mapToResponse(Post post) {
         UserSummary author = UserSummary.builder()
                 .id(post.getUser().getId())
+                .username(post.getUser().getUsername())
                 .fullName(post.getUser().getFullName())
                 .avatarUrl(post.getUser().getAvatarUrl())
                 .build();
@@ -98,7 +99,7 @@ public class PostServiceImpl implements PostService {
             try {
                 for (MultipartFile file : request.getImages()) {
                     Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file, "social-media/posts");
-                    String imgUrl = (String) uploadResult.get("url");
+                    String imgUrl = (String) uploadResult.get("secure_url");
                     PostImage postImage = PostImage.builder()
                             .post(post)
                             .imageUrl(imgUrl)
@@ -161,7 +162,7 @@ public class PostServiceImpl implements PostService {
                 validateImage(file);
                 try {
                     Map<?, ?> uploadResult = cloudinaryService.upload(file, "social-media/posts");
-                    String imgUrl = (String) uploadResult.get("url");
+                    String imgUrl = (String) uploadResult.get("secure_url");
                     PostImage postImage = PostImage.builder()
                             .post(post)
                             .imageUrl(imgUrl)
