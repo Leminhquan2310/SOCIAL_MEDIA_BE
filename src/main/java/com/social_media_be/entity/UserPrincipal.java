@@ -1,6 +1,5 @@
 package com.social_media_be.entity;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,33 +27,31 @@ public class UserPrincipal implements UserDetails, OAuth2User {
   private Map<String, Object> attributes;
 
   public static UserPrincipal build(User user) {
-    List<GrantedAuthority> authorities = user.getRoles().stream().map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList());
+    List<GrantedAuthority> authorities = user.getRoles().stream()
+        .map(role -> new SimpleGrantedAuthority(role.getName())).collect(Collectors.toList());
     return new UserPrincipal(
-      user.getId(),
-      user.getFullName(),
-      user.getProviderId(),
-      user.getPassword(),
-      user.getEmail(),
-      user.isEnabled(),
-      authorities,
-      null
-    );
+        user.getId(),
+        user.getFullName(),
+        user.getUsername(),
+        user.getPassword(),
+        user.getEmail(),
+        user.isEnabled(),
+        authorities,
+        null);
   }
 
   public static UserPrincipal build(User user, Map<String, Object> attributes) {
     UserPrincipal userPrincipal = UserPrincipal.build(user);
     return new UserPrincipal(
-      userPrincipal.getId(),
-      userPrincipal.getFullName(),
-      userPrincipal.getUsername(),
-      userPrincipal.getPassword(),
-      userPrincipal.getEmail(),
-      userPrincipal.isEnabled(),
-      userPrincipal.getAuthorities(),
-      attributes
-    );
+        userPrincipal.getId(),
+        userPrincipal.getFullName(),
+        userPrincipal.getUsername(),
+        userPrincipal.getPassword(),
+        userPrincipal.getEmail(),
+        userPrincipal.isEnabled(),
+        userPrincipal.getAuthorities(),
+        attributes);
   }
-
 
   @Override
   public boolean isEnabled() {
@@ -85,7 +82,6 @@ public class UserPrincipal implements UserDetails, OAuth2User {
   public Collection<? extends GrantedAuthority> getAuthorities() {
     return roles;
   }
-
 
   @Override
   public boolean isAccountNonExpired() {

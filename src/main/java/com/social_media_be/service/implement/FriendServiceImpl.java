@@ -5,6 +5,7 @@ import com.social_media_be.dto.friend.FriendUserDTO;
 import com.social_media_be.entity.Friendship;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.enums.FriendStatus;
+import com.social_media_be.entity.enums.NotificationType;
 import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.exception.UnauthorizedException;
@@ -18,6 +19,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.swing.text.html.Option;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -58,9 +62,10 @@ public class FriendServiceImpl implements FriendService {
     // ── Read ──────────────────────────────────────────────────────────────────
 
     @Override
-    public Page<FriendUserDTO> getFriends(Long userId, Pageable pageable) {
-        return friendshipRepository.findFriendsByUserId(userId, FriendStatus.ACCEPTED, pageable)
-                .map(u -> mapToFriendUserDTO(u, userId));
+    public Page<FriendUserDTO> getFriends(String username, Pageable pageable) {
+        Optional<User> user = userRepository.findByUsername(username);
+        return friendshipRepository.findFriendsByUserId(user.get().getId(), FriendStatus.ACCEPTED, pageable)
+                .map(u -> mapToFriendUserDTO(u, user.get().getId()));
     }
 
     @Override
@@ -149,7 +154,8 @@ public class FriendServiceImpl implements FriendService {
         log.info("Friend request sent from {} to {}", requesterId, receiverId);
 
         // Tạo thông báo realtime
-        notificationService.createAndSendNotification(receiver, requester, NotificationType.FRIEND_REQUEST, saved.getId());
+        notificationService.createAndSendNotification(receiver, requester, NotificationType.FRIEND_REQUEST,
+                saved.getId());
     }
 
     @Override
@@ -188,11 +194,10 @@ public class FriendServiceImpl implements FriendService {
 
         // Thông báo cho người gửi là yêu cầu đã được chấp nhận
         notificationService.createAndSendNotification(
-                saved.getRequester(), 
-                saved.getReceiver(), 
-                NotificationType.FRIEND_ACCEPT, 
-                saved.getId()
-        );
+                saved.getRequester(),
+                saved.getReceiver(),
+                NotificationType.FRIEND_ACCEPT,
+                saved.getId());
     }
 
     @Override
@@ -208,8 +213,7 @@ public class FriendServiceImpl implements FriendService {
             throw new UnauthorizedException("Only the receiver can decline the request");
         }
 
-        friendship.setStatus(FriendStatus.REJECTED);
-        friendshipRepository.save(friendship);
+        friendshipRepository.delete(friendship);
         log.info("Friend request declined: {} declined {}", currentUserId, requesterId);
     }
 

@@ -66,7 +66,7 @@ public class UserServiceImpl implements UserService {
             }
 
             Map uploadResult = cloudinaryService.upload(file, "social-media/avatars");
-            String avatarUrl = (String) uploadResult.get("url");
+            String avatarUrl = (String) uploadResult.get("secure_url");
             user.setAvatarUrl(avatarUrl);
             userRepository.save(user);
             return avatarUrl;

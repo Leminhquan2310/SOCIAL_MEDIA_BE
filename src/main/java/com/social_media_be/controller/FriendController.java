@@ -20,13 +20,15 @@ public class FriendController {
     private final FriendService friendService;
 
     // GET /api/friends?page=0&size=10
-    @GetMapping
+    @GetMapping("/{username}")
     public ResponseEntity<?> getFriends(
+            @PathVariable(value = "username", required = false) String username,
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+        if(username == null) username = userPrincipal.getUsername();
         Page<FriendUserDTO> friends = friendService.getFriends(
-                userPrincipal.getId(), PageRequest.of(page, size));
+                username, PageRequest.of(page, size));
         return ResponseEntity.ok(ApiResponse.success(friends));
     }
 

@@ -6,7 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface FriendService {
-    Page<FriendUserDTO> getFriends(Long userId, Pageable pageable);
+    Page<FriendUserDTO> getFriends(String username, Pageable pageable);
     
     Page<FriendUserDTO> getFriendRequests(Long currentUserId, Pageable pageable);
     

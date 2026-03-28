@@ -122,6 +122,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/username/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/posts/user/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/friends/status/**").permitAll()
+                        .requestMatchers("/ws-notifications/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
