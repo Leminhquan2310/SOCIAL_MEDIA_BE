@@ -15,4 +15,5 @@ public class FriendUserDTO {
     private String fullName;
     private String avatarUrl;
     private long mutualFriendsCount;
+    private Integer exactMatch;
 }

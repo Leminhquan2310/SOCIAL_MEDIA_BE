@@ -11,6 +11,9 @@ import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 
 import com.social_media_be.entity.enums.AuthProvider;
+import java.util.List;
+
+import com.social_media_be.dto.user.UserSearchProjection;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -37,4 +40,36 @@ public interface UserRepository extends JpaRepository<User, Long> {
            ")",
            nativeQuery = true)
     Page<User> findFriendSuggestions(@Param("currentUserId") Long currentUserId, Pageable pageable);
+
+    @Query(value = "SELECT * FROM (" +
+           "  SELECT u.id, u.username, u.full_name as fullName, u.avatar_url as avatarUrl, " +
+           "  (CASE WHEN LOWER(u.username) = LOWER(:query) OR LOWER(u.full_name) = LOWER(:query) THEN 1 ELSE 0 END) as exact_match, " +
+           "  (SELECT COUNT(*) FROM (" +
+           "      SELECT f1.friend_id FROM (" +
+           "          SELECT receiver_id as friend_id FROM friendships WHERE requester_id = :currentUserId AND status = 'ACCEPTED' " +
+           "          UNION SELECT requester_id as friend_id FROM friendships WHERE receiver_id = :currentUserId AND status = 'ACCEPTED' " +
+           "      ) f1 " +
+           "      JOIN (" +
+           "          SELECT receiver_id as friend_id FROM friendships WHERE requester_id = u.id AND status = 'ACCEPTED' " +
+           "          UNION SELECT requester_id as friend_id FROM friendships WHERE receiver_id = u.id AND status = 'ACCEPTED' " +
+           "      ) f2 ON f1.friend_id = f2.friend_id " +
+           "  ) as m) as mutual_count " +
+           "  FROM users u " +
+           "  WHERE u.id != :currentUserId " +
+           "  AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(u.full_name) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           ") as result " +
+           "WHERE (:lastExactMatch IS NULL OR " +
+           "      (exact_match < :lastExactMatch) OR " +
+           "      (exact_match = :lastExactMatch AND mutual_count < :lastMutualCount) OR " +
+           "      (exact_match = :lastExactMatch AND mutual_count = :lastMutualCount AND id < :lastId)) " +
+           "ORDER BY exact_match DESC, mutual_count DESC, id DESC " +
+           "LIMIT :limit",
+           nativeQuery = true)
+    List<UserSearchProjection> searchUsers(
+            @Param("query") String query,
+            @Param("currentUserId") Long currentUserId,
+            @Param("lastExactMatch") Integer lastExactMatch,
+            @Param("lastMutualCount") Integer lastMutualCount,
+            @Param("lastId") Long lastId,
+            @Param("limit") int limit);
 }

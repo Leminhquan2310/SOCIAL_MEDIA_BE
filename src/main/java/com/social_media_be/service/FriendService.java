@@ -2,11 +2,12 @@ package com.social_media_be.service;
 
 import com.social_media_be.dto.friend.FriendStatusDTO;
 import com.social_media_be.dto.friend.FriendUserDTO;
+import com.social_media_be.entity.UserPrincipal;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface FriendService {
-    Page<FriendUserDTO> getFriends(String username, Pageable pageable);
+    Page<FriendUserDTO> getFriends(UserPrincipal uPrincipal, String username, Pageable pageable);
     
     Page<FriendUserDTO> getFriendRequests(Long currentUserId, Pageable pageable);
     
