@@ -28,7 +28,10 @@ public class FriendController {
             @RequestParam(defaultValue = "10") int size) {
         if(username == null) username = userPrincipal.getUsername();
         Page<FriendUserDTO> friends = friendService.getFriends(
-                username, PageRequest.of(page, size));
+                userPrincipal,
+                username,
+                PageRequest.of(page, size)
+        );
         return ResponseEntity.ok(ApiResponse.success(friends));
     }
 

@@ -1,7 +1,9 @@
 package com.social_media_be.controller;
 
 import com.social_media_be.dto.auth.UserProfileResponse;
+import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.user.UpdateProfileRequest;
+import com.social_media_be.dto.user.UserSummary;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.UserPrincipal;
 import com.social_media_be.service.FriendService;
@@ -13,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -96,4 +100,15 @@ public class UserController {
         String newAvatarUrl = userService.updateAvatar(userPrincipal.getId(), file);
         return ResponseEntity.ok(ApiResponse.success(newAvatarUrl));
     }
+
+//    @GetMapping("/seach")
+//    public ResponseEntity<?> searchUser(
+//            @RequestParam String q,
+//            @RequestParam(required = false) Long lastPostId,
+//            @RequestParam(defaultValue = "10") int limit,
+//            @AuthenticationPrincipal UserPrincipal userPrincipal
+//    ){
+//        List<UserSummary> response = userService.searchUsers(q, userPrincipal.getId(), lastPostId, limit);
+//        return ResponseEntity.ok(response);
+//    }
 }

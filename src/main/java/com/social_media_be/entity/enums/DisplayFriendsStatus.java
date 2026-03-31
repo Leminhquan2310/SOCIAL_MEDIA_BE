@@ -2,6 +2,6 @@ package com.social_media_be.entity.enums;
 
 public enum DisplayFriendsStatus {
     PUBLIC,
-    PRIVATE,
+    FRIEND_ONLY,
     ONLY_ME
 }
