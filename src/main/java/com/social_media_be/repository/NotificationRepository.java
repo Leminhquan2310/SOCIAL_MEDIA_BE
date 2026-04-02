@@ -16,6 +16,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     long countByReceiverIdAndIsReadFalse(Long receiverId);
     
+    java.util.Optional<Notification> findFirstByReceiverIdAndTypeAndReferenceId(Long receiverId, com.social_media_be.entity.enums.NotificationType type, Long referenceId);
+    
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.type = :type AND n.actor.id = :actorId AND n.receiver.id = :receiverId")
     void deleteByTypeAndActorIdAndReceiverId(@Param("type") com.social_media_be.entity.enums.NotificationType type, 

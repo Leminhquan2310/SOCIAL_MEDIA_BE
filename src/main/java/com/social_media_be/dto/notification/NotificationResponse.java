@@ -17,7 +17,9 @@ public class NotificationResponse {
     private Long referenceId;
     private boolean isRead;
     private boolean isActionable;
+    private boolean isSilent; // NEW: Nếu true, frontend sẽ không hiện Toast
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt; // Để đồng bộ thời gian mới nhất khi gộp
 
     public static NotificationResponse fromEntity(Notification notification) {
         return NotificationResponse.builder()
@@ -31,8 +33,10 @@ public class NotificationResponse {
                 .type(notification.getType())
                 .referenceId(notification.getReferenceId())
                 .isRead(notification.isRead())
-                .isActionable(false) // Will be set by service if needed
+                .isActionable(false)
+                .isSilent(false)
                 .createdAt(notification.getCreatedAt())
+                .updatedAt(notification.getUpdatedAt())
                 .build();
     }
 }

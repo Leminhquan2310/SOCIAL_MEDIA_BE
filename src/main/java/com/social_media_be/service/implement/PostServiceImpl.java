@@ -10,8 +10,10 @@ import com.social_media_be.entity.PostImage;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.enums.FriendStatus;
 import com.social_media_be.entity.enums.Privacy;
+import com.social_media_be.entity.enums.TargetType;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.FriendshipRepository;
+import com.social_media_be.repository.LikeRepository;
 import com.social_media_be.repository.PostRepository;
 import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.CloudinaryService;
@@ -40,13 +42,14 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final CloudinaryService cloudinaryService;
+    private final LikeRepository likeRepository;
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
-    private PostResponse mapToResponse(Post post) {
+    private PostResponse mapToResponse(Post post, Long currentUserId) {
         UserSummary author = UserSummary.builder()
                 .id(post.getUser().getId())
                 .username(post.getUser().getUsername())
@@ -67,6 +70,9 @@ public class PostServiceImpl implements PostService {
                         .build())
                 .collect(Collectors.toList());
 
+        boolean isLiked = currentUserId != null &&
+                likeRepository.existsByUserIdAndTargetIdAndTargetType(currentUserId, post.getId(), TargetType.POST);
+
         return PostResponse.builder()
                 .id(post.getId())
                 .content(post.getContent())
@@ -74,8 +80,9 @@ public class PostServiceImpl implements PostService {
                 .feeling(post.getFeeling())
                 .author(author)
                 .images(imageDtos)
-                .likeCount(0) // TODO: implement likes
-                .commentCount(0) // TODO: implement comments
+                .likeCount(post.getLikeCount() != null ? post.getLikeCount() : 0)
+                .commentCount(post.getCommentCount() != null ? post.getCommentCount() : 0)
+                .isLiked(isLiked)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
@@ -114,7 +121,7 @@ public class PostServiceImpl implements PostService {
         }
 
         Post savedPost = postRepository.save(post);
-        return mapToResponse(savedPost);
+        return mapToResponse(savedPost, userId);
     }
 
     @Override
@@ -123,7 +130,7 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.findUserPosts(user.getId(), lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
     }
 
     @Override
@@ -235,7 +242,7 @@ public class PostServiceImpl implements PostService {
         }
 
         Post savedPost = postRepository.save(post);
-        return mapToResponse(savedPost);
+        return mapToResponse(savedPost, userId);
     }
 
     private void validateImage(MultipartFile file) {
@@ -284,7 +291,7 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.findNewsFeedPosts(user.getId(), lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
     }
 
     @Override
@@ -300,7 +307,7 @@ public class PostServiceImpl implements PostService {
         List<Privacy> allowedPrivacies = isFriend ? List.of(Privacy.PUBLIC, Privacy.FRIEND_ONLY) : List.of(Privacy.PUBLIC);
 
         List<Post> posts = postRepository.findUserPostsWithPrivacy(targetUserId, allowedPrivacies, lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, currentUserId)).collect(Collectors.toList());
     }
 
     @Override
@@ -309,6 +316,6 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.searchFeedPosts(user.getId(), keyword, lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
     }
 }

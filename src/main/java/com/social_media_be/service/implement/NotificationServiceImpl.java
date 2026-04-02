@@ -35,38 +35,62 @@ public class NotificationServiceImpl implements NotificationService {
             return;
         }
 
-        // 1.5 Cleanup: Xoá thông báo kết bạn cũ cùng loại giữa 2 người này (Chống spam)
-        if (type == NotificationType.FRIEND_REQUEST || type == NotificationType.FRIEND_ACCEPT) {
-            notificationRepository.deleteByTypeAndActorIdAndReceiverId(type, actor.getId(), receiver.getId());
+        Notification notification;
+        boolean isLikeType = (type == NotificationType.LIKE_POST || type == NotificationType.LIKE_COMMENT);
+
+        if (isLikeType) {
+            // Grouping logic: Tìm thông báo Like cũ cho cùng referenceId
+            notification = notificationRepository
+                    .findFirstByReceiverIdAndTypeAndReferenceId(receiver.getId(), type, referenceId)
+                    .orElse(null);
+
+            if (notification != null) {
+                notification.setActor(actor); // Update to latest liker
+                notification.setRead(false);
+                // JPA PreUpdate will handle updatedAt
+            } else {
+                notification = createNewNotification(receiver, actor, type, referenceId);
+            }
+        } else {
+            // Cleanup: Xoá thông báo kết bạn cũ cùng loại giữa 2 người này (Chống spam)
+            if (type == NotificationType.FRIEND_REQUEST || type == NotificationType.FRIEND_ACCEPT) {
+                notificationRepository.deleteByTypeAndActorIdAndReceiverId(type, actor.getId(), receiver.getId());
+            }
+            notification = createNewNotification(receiver, actor, type, referenceId);
         }
 
-        // 2. Lưu vào Database
-        Notification notification = Notification.builder()
+        Notification saved = notificationRepository.save(notification);
+        log.info("Notification {} for user {}: {}", notification.getId() != null ? "updated" : "created",
+                receiver.getId(), type);
+
+        // 3. Gửi qua WebSocket
+        try {
+            boolean isSilent = isLikeType; // Yêu cầu: "khi like sẽ không cần hiện toast"
+
+            NotificationResponse wsPayload = NotificationResponse.fromEntity(saved).toBuilder()
+                    .isActionable(saved.getType() == NotificationType.FRIEND_REQUEST)
+                    .isSilent(isSilent)
+                    .build();
+
+            messagingTemplate.convertAndSendToUser(
+                    receiver.getUsername(),
+                    "/queue/notifications",
+                    wsPayload);
+            log.info("Notification pushed to user {} (silent={}): /user/queue/notifications", receiver.getUsername(),
+                    isSilent);
+        } catch (Exception e) {
+            log.error("Failed to push notification via WebSocket: {}", e.getMessage());
+        }
+    }
+
+    private Notification createNewNotification(User receiver, User actor, NotificationType type, Long referenceId) {
+        return Notification.builder()
                 .receiver(receiver)
                 .actor(actor)
                 .type(type)
                 .referenceId(referenceId)
                 .isRead(false)
                 .build();
-
-        Notification saved = notificationRepository.save(notification);
-        log.info("Notification created for user {}: {}", receiver.getId(), type);
-
-        // 3. Gửi qua WebSocket
-        try {
-            log.info("Preparing to send WS notification. Receiver Username: {}, ProviderId: {}", 
-                    receiver.getUsername(), receiver.getProviderId());
-            messagingTemplate.convertAndSendToUser(
-                    receiver.getUsername(),
-                    "/queue/notifications",
-                    NotificationResponse.fromEntity(saved).toBuilder()
-                            .isActionable(saved.getType() == NotificationType.FRIEND_REQUEST)
-                            .build()
-            );
-            log.info("Notification pushed to user {}: /user/queue/notifications", receiver.getUsername());
-        } catch (Exception e) {
-            log.error("Failed to push notification via WebSocket: {}", e.getMessage());
-        }
     }
 
     @Override
@@ -75,8 +99,9 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationRepository.findByReceiverIdOrderByCreatedAtDesc(userId, pageable)
                 .map(notification -> {
                     NotificationResponse response = NotificationResponse.fromEntity(notification);
-                    
-                    // Enhancement Logic: Nếu là thông báo kết bạn, check xem record friendship còn PENDING không
+
+                    // Enhancement Logic: Nếu là thông báo kết bạn, check xem record friendship còn
+                    // PENDING không
                     if (notification.getType() == NotificationType.FRIEND_REQUEST) {
                         boolean isActionable = friendshipRepository.findById(notification.getReferenceId())
                                 .map(f -> f.getStatus() == FriendStatus.PENDING)
@@ -91,7 +116,7 @@ public class NotificationServiceImpl implements NotificationService {
                                 .createdAt(response.getCreatedAt())
                                 .build();
                     }
-                    
+
                     return response;
                 });
     }
@@ -106,7 +131,7 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional
     public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found: " + notificationId));
 
         if (!notification.getReceiver().getId().equals(userId)) {
             throw new UnauthorizedException("You cannot mark this notification as read");

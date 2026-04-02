@@ -19,6 +19,7 @@ public class PostResponse {
     private List<PostImageDto> images;
     private Integer likeCount;
     private Integer commentCount;
+    private boolean isLiked;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

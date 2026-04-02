@@ -41,6 +41,7 @@ public class DataInitializer implements CommandLineRunner {
     if (!userRepository.existsByAuthProviderAndProviderId(AuthProvider.LOCAL, "admin")) {
       User admin = User.builder()
         .providerId("admin")
+        .username("admin")
         .authProvider(AuthProvider.LOCAL)
         .avatarUrl(avatarDefault)
         .email("admin@gmail.com")
@@ -59,6 +60,7 @@ public class DataInitializer implements CommandLineRunner {
       User user = User.builder()
         .providerId("nguyenvana")
         .authProvider(AuthProvider.LOCAL)
+        .username("nguyenvana")
         .email("nguyenvana@gmail.com")
         .avatarUrl(avatarDefault)
         .password(passwordEncoder.encode("123456"))
