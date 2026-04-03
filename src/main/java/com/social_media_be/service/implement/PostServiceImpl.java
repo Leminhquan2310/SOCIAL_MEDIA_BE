@@ -187,7 +187,7 @@ public class PostServiceImpl implements PostService {
         // Handle Reordering and New Image Integration
         if (request.getImageOrder() != null && !request.getImageOrder().isEmpty()) {
             List<PostImage> currentImages = post.getImages();
-            
+
             // To track which new image is which: filter those without ID (newly added at line 171)
             List<PostImage> newAddedImages = currentImages.stream()
                 .filter(img -> img.getId() == null)
@@ -221,7 +221,7 @@ public class PostServiceImpl implements PostService {
                     } catch (NumberFormatException ignored) {}
                 }
             }
-            
+
             // Safety check: Keep any existing images that weren't in the ordering list but weren't marked for deletion
             for (PostImage img : currentImages) {
                 if (!orderedList.contains(img)) {
@@ -236,7 +236,7 @@ public class PostServiceImpl implements PostService {
                 .filter(img -> !orderedList.contains(img))
                 .collect(Collectors.toList());
             currentImages.removeAll(toRemove);
-            
+
             // Add any that are in orderedList but not in currentImages (should be none because we added them all at 171)
             // But we actually want to ensure the orderIndex is updated. The objects are the same, so it's already updated.
         }
@@ -250,8 +250,8 @@ public class PostServiceImpl implements PostService {
             throw new IllegalArgumentException("Image file is empty");
         }
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("image/jpeg") && 
-                                   !contentType.equals("image/png") && 
+        if (contentType == null || (!contentType.equals("image/jpeg") &&
+                                   !contentType.equals("image/png") &&
                                    !contentType.equals("image/webp"))) {
             throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
         }
@@ -298,7 +298,7 @@ public class PostServiceImpl implements PostService {
     @Transactional(readOnly = true)
     public List<PostResponse> getUserPosts(Long targetUserId, Long currentUserId, Long lastPostId, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
-        
+
         if (currentUserId != null && currentUserId.equals(targetUserId)) {
             return getMyPosts(currentUserId, lastPostId, limit);
         }

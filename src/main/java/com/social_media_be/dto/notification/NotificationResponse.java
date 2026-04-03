@@ -18,6 +18,7 @@ public class NotificationResponse {
     private boolean isRead;
     private boolean isActionable;
     private boolean isSilent; // NEW: Nếu true, frontend sẽ không hiện Toast
+    private Integer actorCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt; // Để đồng bộ thời gian mới nhất khi gộp
 
@@ -35,6 +36,7 @@ public class NotificationResponse {
                 .isRead(notification.isRead())
                 .isActionable(false)
                 .isSilent(false)
+                .actorCount(notification.getActorCount())
                 .createdAt(notification.getCreatedAt())
                 .updatedAt(notification.getUpdatedAt())
                 .build();

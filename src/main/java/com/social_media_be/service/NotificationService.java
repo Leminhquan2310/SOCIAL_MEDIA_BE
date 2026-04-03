@@ -12,4 +12,5 @@ public interface NotificationService {
     long getUnreadCount(Long userId);
     void markAsRead(Long notificationId, Long userId);
     void markAllAsRead(Long userId);
+    void removeLikeNotification(User actor, NotificationType type, Long referenceId);
 }

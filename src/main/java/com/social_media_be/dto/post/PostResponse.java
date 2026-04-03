@@ -11,15 +11,15 @@ import java.util.List;
 @Data
 @Builder
 public class PostResponse {
-    private Long id;
-    private String content;
-    private Privacy privacy;
-    private String feeling;
-    private UserSummary author;
-    private List<PostImageDto> images;
-    private Integer likeCount;
-    private Integer commentCount;
-    private boolean isLiked;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+  private Long id;
+  private String content;
+  private Privacy privacy;
+  private String feeling;
+  private UserSummary author;
+  private List<PostImageDto> images;
+  private Integer likeCount;
+  private Integer commentCount;
+  private Boolean isLiked;
+  private LocalDateTime createdAt;
+  private LocalDateTime updatedAt;
 }

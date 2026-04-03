@@ -55,13 +55,16 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
        @Transactional
        @Modifying
-       @Query("UPDATE Post p SET p.likeCount = COALESCE(p.likeCount, 0) + 1 WHERE p.id = :postId")
-       void incrementLikeCount(@Param("postId") Long postId);
+       @Query("UPDATE Post p SET p.likeCount = GREATEST(0, COALESCE(p.likeCount, 0) + :delta) WHERE p.id = :postId")
+       void incrementLikeCount(@Param("postId") Long postId, @Param("delta") long delta);
 
        @Transactional
        @Modifying
        @Query("UPDATE Post p SET p.likeCount = GREATEST(0, COALESCE(p.likeCount, 0) - 1) WHERE p.id = :postId")
        void decrementLikeCount(@Param("postId") Long postId);
+
+       @Query("SELECT COUNT(p.id) FROM Post p WHERE p.id = :postId")
+       Long getLikeCount(@Param("postId") Long postId);
 
        @Transactional
        @Modifying

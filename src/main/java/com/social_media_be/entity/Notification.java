@@ -33,6 +33,10 @@ public class Notification {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Column(name = "actor_count", nullable = false)
+    @Builder.Default
+    private Integer actorCount = 1;
+
     @Column(name = "is_read", nullable = false)
     @Builder.Default
     private boolean isRead = false;

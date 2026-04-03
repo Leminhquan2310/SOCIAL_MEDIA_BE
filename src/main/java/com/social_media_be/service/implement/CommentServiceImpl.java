@@ -16,7 +16,6 @@ import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
 import com.social_media_be.service.CommentService;
 import com.social_media_be.service.NotificationService;
-import com.social_media_be.service.EntityCountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +37,7 @@ public class CommentServiceImpl implements CommentService {
     private final LikeRepository likeRepository;
     private final FriendshipRepository friendshipRepository;
     private final NotificationService notificationService;
-    private final EntityCountService entityCountService;
+    private final EntityCountServiceImpl entityCountService;
     private final CloudinaryService cloudinaryService;
 
     @Override
@@ -82,7 +81,7 @@ public class CommentServiceImpl implements CommentService {
 
         // Tăng commentCount của Post
         entityCountService.handlePostCommentCount(postId, true, 1);
-        
+
         // Nếu là reply, tăng replyCount của comment cha
         if (parentComment != null) {
             entityCountService.handleCommentReplyCount(parentComment.getId(), true);
@@ -199,7 +198,7 @@ public class CommentServiceImpl implements CommentService {
         if (userId != null) {
             isLiked = likeRepository.existsByUserIdAndTargetIdAndTargetType(userId, comment.getId(), TargetType.COMMENT);
         }
-        
+
         return CommentResponseDto.builder()
                 .id(comment.getId())
                 .postId(comment.getPost().getId())

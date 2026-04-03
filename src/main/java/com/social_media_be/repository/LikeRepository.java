@@ -13,4 +13,7 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
     boolean existsByUserIdAndTargetIdAndTargetType(Long userId, Long targetId, TargetType targetType);
     long countByTargetIdAndTargetType(Long targetId, TargetType targetType);
     void deleteByTargetIdAndTargetType(Long targetId, TargetType targetType);
+    
+    // Tìm người like mới nhất để làm actor đại diện trong thông báo gộp
+    java.util.Optional<Like> findFirstByTargetIdAndTargetTypeOrderByCreatedAtDesc(Long targetId, TargetType targetType);
 }

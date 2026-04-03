@@ -1,5 +1,7 @@
 package com.social_media_be.service.implement;
 
+import com.social_media_be.buffer.LikeCommentCountBuffer;
+import com.social_media_be.buffer.LikePostCountBuffer;
 import com.social_media_be.entity.Comment;
 import com.social_media_be.entity.Like;
 import com.social_media_be.entity.Post;
@@ -10,13 +12,14 @@ import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.*;
 import com.social_media_be.service.LikeService;
 import com.social_media_be.service.NotificationService;
-import com.social_media_be.service.EntityCountService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LikeServiceImpl implements LikeService {
@@ -26,8 +29,8 @@ public class LikeServiceImpl implements LikeService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
-    private final EntityCountService entityCountService;
-    private final NotificationRepository notificationRepository;
+    private final LikePostCountBuffer likePostCountBuffer;
+    private final LikeCommentCountBuffer likeCommentCountBuffer;
 
     @Override
     @Transactional
@@ -39,8 +42,10 @@ public class LikeServiceImpl implements LikeService {
 
         if (existingLike.isPresent()) {
             likeRepository.delete(existingLike.get());
-            entityCountService.handleLikeCount(targetId, targetType, false);
-//            notificationRepository.delete();
+            long likes = targetType == TargetType.POST ? likePostCountBuffer.decrement(targetId) : likeCommentCountBuffer.decrement(targetId);
+            // Xử lý thông báo khi unlike
+            NotificationType notificationType = (targetType == TargetType.POST) ? NotificationType.LIKE_POST : NotificationType.LIKE_COMMENT;
+            notificationService.removeLikeNotification(user, notificationType, targetId);
         } else {
             Like like = Like.builder()
                     .user(user)
@@ -48,10 +53,7 @@ public class LikeServiceImpl implements LikeService {
                     .targetType(targetType)
                     .build();
             likeRepository.save(like);
-            entityCountService.handleLikeCount(targetId, targetType, true);
-
-            // Gửi thông báo
-            sendLikeNotification(targetId, targetType, user);
+            long likes = targetType == TargetType.POST ? likePostCountBuffer.increment(targetId) : likeCommentCountBuffer.increment(targetId);
         }
     }
 
@@ -85,6 +87,8 @@ public class LikeServiceImpl implements LikeService {
 
     @Override
     public long getLikeCount(Long targetId, TargetType targetType) {
-        return likeRepository.countByTargetIdAndTargetType(targetId, targetType);
+        long dbCount = likeRepository.countByTargetIdAndTargetType(targetId, targetType);
+        long bufferDelta = targetType == TargetType.POST ? likePostCountBuffer.get(targetId) : likeCommentCountBuffer.get(targetId);
+        return Math.max(0, dbCount + bufferDelta);
     }
 }

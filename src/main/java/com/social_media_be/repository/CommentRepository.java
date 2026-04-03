@@ -25,4 +25,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // Đếm tổng số lượng comment của 1 post
     long countByPostId(Long postId);
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE Comment c SET c.likeCount = GREATEST(0, COALESCE(c.likeCount, 0) + :delta) WHERE c.id = :commentId")
+    void incrementLikeCount(@org.springframework.data.repository.query.Param("commentId") Long commentId, @org.springframework.data.repository.query.Param("delta") long delta);
+
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE Comment c SET c.likeCount = GREATEST(0, COALESCE(c.likeCount, 0) - 1) WHERE c.id = :commentId")
+    void decrementLikeCount(@org.springframework.data.repository.query.Param("commentId") Long commentId);
 }

@@ -7,7 +7,9 @@ import com.social_media_be.entity.enums.NotificationType;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.exception.UnauthorizedException;
 import com.social_media_be.entity.enums.FriendStatus;
+import com.social_media_be.entity.enums.TargetType;
 import com.social_media_be.repository.FriendshipRepository;
+import com.social_media_be.repository.LikeRepository;
 import com.social_media_be.repository.NotificationRepository;
 import com.social_media_be.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final FriendshipRepository friendshipRepository;
+    private final LikeRepository likeRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
@@ -39,13 +42,14 @@ public class NotificationServiceImpl implements NotificationService {
         boolean isLikeType = (type == NotificationType.LIKE_POST || type == NotificationType.LIKE_COMMENT);
 
         if (isLikeType) {
-            // Grouping logic: Tìm thông báo Like cũ cho cùng referenceId
+            // Grouping logic: Tìm thông báo Like CHƯA ĐỌC cho cùng referenceId
             notification = notificationRepository
-                    .findFirstByReceiverIdAndTypeAndReferenceId(receiver.getId(), type, referenceId)
+                    .findFirstByReceiverIdAndTypeAndReferenceIdAndIsReadFalse(receiver.getId(), type, referenceId)
                     .orElse(null);
 
             if (notification != null) {
                 notification.setActor(actor); // Update to latest liker
+                notification.setActorCount(notification.getActorCount() + 1);
                 notification.setRead(false);
                 // JPA PreUpdate will handle updatedAt
             } else {
@@ -60,10 +64,6 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         Notification saved = notificationRepository.save(notification);
-        log.info("Notification {} for user {}: {}", notification.getId() != null ? "updated" : "created",
-                receiver.getId(), type);
-
-        // 3. Gửi qua WebSocket
         try {
             boolean isSilent = isLikeType; // Yêu cầu: "khi like sẽ không cần hiện toast"
 
@@ -145,5 +145,26 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional
     public void markAllAsRead(Long userId) {
         notificationRepository.markAllAsRead(userId);
+    }
+
+    @Override
+    @Transactional
+    public void removeLikeNotification(User actor, NotificationType type, Long referenceId) {
+        // Tìm thông báo gộp CHƯA ĐỌC tương ứng bằng type và referenceId
+        notificationRepository.findFirstByTypeAndReferenceIdAndIsReadFalse(type, referenceId)
+                .ifPresent(notification -> {
+                    notification.setActorCount(Math.max(0, notification.getActorCount() - 1));
+                    if (notification.getActorCount() == 0) {
+                        notificationRepository.delete(notification);
+                    } else {
+                        // Nếu Actor bị xóa là actor chính, tìm người like mới nhất làm đại diện
+                        if (notification.getActor().getId().equals(actor.getId())) {
+                            TargetType targetType = (type == NotificationType.LIKE_POST) ? TargetType.POST : TargetType.COMMENT;
+                            likeRepository.findFirstByTargetIdAndTargetTypeOrderByCreatedAtDesc(referenceId, targetType)
+                                    .ifPresent(like -> notification.setActor(like.getUser()));
+                        }
+                        notificationRepository.save(notification);
+                    }
+                });
     }
 }
