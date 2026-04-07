@@ -40,11 +40,11 @@ public class CommentController {
     }
 
     @PutMapping("/comments/{commentId}")
-    public ResponseEntity<CommentResponseDto> updateComment(
+    public ResponseEntity<?> updateComment(
             @PathVariable Long commentId,
             @Valid @RequestBody CommentRequestDto request,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
-        return ResponseEntity.ok(commentService.updateComment(commentId, request, userPrincipal.getId()));
+        return ResponseEntity.ok(ApiResponse.success(commentService.updateComment(commentId, request, userPrincipal.getId())));
     }
 
     @DeleteMapping("/comments/{commentId}")

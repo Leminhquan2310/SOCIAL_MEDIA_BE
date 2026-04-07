@@ -39,6 +39,7 @@ public class CommentServiceImpl implements CommentService {
     private final NotificationService notificationService;
     private final EntityCountServiceImpl entityCountService;
     private final CloudinaryService cloudinaryService;
+    private final NotificationRepository notificationRepository;
 
     @Override
     @Transactional
@@ -69,12 +70,24 @@ public class CommentServiceImpl implements CommentService {
             }
         }
 
+        // LOGIC 2-LEVEL: Nếu parentComment đang là một reply (đã có parent), 
+        // thì đẩy reply mới này lên cùng hàng với parentComment đó (cùng trỏ về Root).
+        Comment actualParent = parentComment;
+        User replyToUser = null;
+        if (parentComment != null) {
+            replyToUser = parentComment.getUser(); // Người mà user thực sự nhấn Reply
+            if (parentComment.getParentComment() != null) {
+                actualParent = parentComment.getParentComment();
+            }
+        }
+
         Comment comment = Comment.builder()
                 .post(post)
                 .user(user)
                 .content(request.getContent())
                 .imageUrl(uploadResult != null ? (String) uploadResult.get("secure_url") : null)
-                .parentComment(parentComment)
+                .parentComment(actualParent)
+                .replyToUser(replyToUser)
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
@@ -82,21 +95,21 @@ public class CommentServiceImpl implements CommentService {
         // Tăng commentCount của Post
         entityCountService.handlePostCommentCount(postId, true, 1);
 
-        // Nếu là reply, tăng replyCount của comment cha
-        if (parentComment != null) {
-            entityCountService.handleCommentReplyCount(parentComment.getId(), true);
+        // Nếu là reply, tăng replyCount của comment cha (luôn là Root)
+        if (actualParent != null) {
+            entityCountService.handleCommentReplyCount(actualParent.getId(), true);
         }
 
         // Send Notification
         if (parentComment != null) {
             // Reply notification
             if (!parentComment.getUser().getId().equals(userId)) {
-                notificationService.createAndSendNotification(parentComment.getUser(), user, NotificationType.REPLY_COMMENT, savedComment.getId());
+                notificationService.createAndSendNotification(parentComment.getUser(), user, NotificationType.REPLY_COMMENT, savedComment.getId(), post.getId());
             }
         } else {
             // New comment notification to post owner
             if (!post.getUser().getId().equals(userId)) {
-                notificationService.createAndSendNotification(post.getUser(), user, NotificationType.COMMENT_POST, post.getId());
+                notificationService.createAndSendNotification(post.getUser(), user, NotificationType.COMMENT_POST, savedComment.getId(), post.getId());
             }
         }
 
@@ -113,20 +126,8 @@ public class CommentServiceImpl implements CommentService {
             throw new UnauthorizedException("Bạn không có quyền chỉnh sửa bình luận này");
         }
 
-        Map<String, Object> uploadResult = null;
-        if (comment.getImageUrl() != null) {
-            try {
-                String publicId = cloudinaryService.extractPublicId(comment.getImageUrl());
-                cloudinaryService.delete(publicId);
-                uploadResult = (Map<String, Object>) cloudinaryService.upload(request.getImage(), "social-media/comments");
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new BadRequestException("Upload image failed!");
-            }
-        }
-
         comment.setContent(request.getContent());
-        comment.setImageUrl(uploadResult != null ? (String) uploadResult.get("secure_url") : null);
+        comment.setEdited(true);
         Comment updatedComment = commentRepository.save(comment);
 
         return mapToResponseDto(updatedComment, userId);
@@ -144,20 +145,52 @@ public class CommentServiceImpl implements CommentService {
         }
 
         Long postId = comment.getPost().getId();
-        int commentsToRemove = 1; // Bản thân comment này
+        int commentsToRemove = 1;
+
+        // 1. Phân loại và thu thập IDs cần xóa (Likes, Notifications)
+        List<Long> targetIdsToDelete = new java.util.ArrayList<>();
+        targetIdsToDelete.add(commentId);
+
+        List<String> imageUrlsToDelete = new java.util.ArrayList<>();
+        if (comment.getImageUrl() != null) imageUrlsToDelete.add(comment.getImageUrl());
 
         if (comment.getParentComment() == null) {
-            // Nếu là comment gốc: lấy số lượng replies (vì sẽ bị xóa cascade)
-            long replyCount = commentRepository.countByParentCommentId(commentId);
-            commentsToRemove += (int) replyCount;
+            // Nếu là comment gốc: lấy danh sách replies để dọn dẹp
+            List<Comment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId);
+            for (Comment reply : replies) {
+                targetIdsToDelete.add(reply.getId());
+                if (reply.getImageUrl() != null) imageUrlsToDelete.add(reply.getImageUrl());
+            }
+            commentsToRemove += replies.size();
         } else {
-            // Nếu là reply, giảm replyCount của comment cha
+            // Nếu là reply, giảm replyCount của comment cha (Root)
             entityCountService.handleCommentReplyCount(comment.getParentComment().getId(), false);
         }
 
-        // Giảm commentCount của Post
+        // 2. Dọn dẹp Cloudinary
+        for (String url : imageUrlsToDelete) {
+            try {
+                String publicId = cloudinaryService.extractPublicId(url);
+                cloudinaryService.delete(publicId);
+            } catch (Exception e) {
+                // Log and continue, avoid failing the whole transaction if image delete fails
+                System.err.println("Failed to delete image from Cloudinary: " + url);
+            }
+        }
+
+        // 3. Dọn dẹp Database (Likes & Notifications)
+        likeRepository.deleteByTargetIdInAndTargetType(targetIdsToDelete, TargetType.COMMENT);
+        
+        // Notifications: Xóa thông báo liên quan đến comment hoặc reply (REPLY_COMMENT, LIKE_COMMENT)
+        notificationRepository.deleteByReferenceIdInAndTypeIn(
+            targetIdsToDelete, 
+            java.util.Arrays.asList(NotificationType.REPLY_COMMENT, NotificationType.LIKE_COMMENT)
+        );
+
+        // 4. Cập nhật số lượng Post
         entityCountService.handlePostCommentCount(postId, false, commentsToRemove);
 
+        // 5. Xóa thực thể (Cascade sẽ xóa nốt các replies trong DB nếu là Root)
         commentRepository.delete(comment);
     }
 
@@ -204,16 +237,19 @@ public class CommentServiceImpl implements CommentService {
                 .postId(comment.getPost().getId())
                 .authorId(comment.getUser().getId())
                 .authorName(comment.getUser().getFullName() != null ? comment.getUser().getFullName() : comment.getUser().getUsername())
+                .authorUsername(comment.getUser().getUsername())
                 .authorAvatar(comment.getUser().getAvatarUrl())
                 .content(comment.getContent())
                 .imageUrl(comment.getImageUrl())
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
-                .parentCommentId(comment.getParentComment() != null ? comment.getParentComment().getId() : null)
-                .parentCommentName(comment.getParentComment() != null ? comment.getParentComment().getUser().getFullName() : null)
+                .parentCommentId(comment.getReplyToUser() != null ? comment.getReplyToUser().getId() : null)
+                .parentCommentName(comment.getReplyToUser() != null ? comment.getReplyToUser().getFullName() : null)
+                .parentCommentUsername(comment.getReplyToUser() != null ? comment.getReplyToUser().getUsername() : null)
                 .likeCount(comment.getLikeCount())
                 .isLiked(isLiked)
                 .replyCount(comment.getReplyCount())
+                .edited(comment.isEdited())
                 .build();
     }
 }

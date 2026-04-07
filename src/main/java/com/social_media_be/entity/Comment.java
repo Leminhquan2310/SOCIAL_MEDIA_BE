@@ -34,6 +34,10 @@ public class Comment {
     private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_user_id")
+    private User replyToUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
@@ -54,6 +58,10 @@ public class Comment {
     @Column(name = "reply_count")
     @Builder.Default
     private Integer replyCount = 0;
+
+    @Column(name = "is_edited")
+    @Builder.Default
+    private boolean edited = false;
 
     @PrePersist
     protected void onCreate() {

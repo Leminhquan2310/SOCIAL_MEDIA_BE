@@ -54,6 +54,8 @@ public class LikeServiceImpl implements LikeService {
                     .build();
             likeRepository.save(like);
             long likes = targetType == TargetType.POST ? likePostCountBuffer.increment(targetId) : likeCommentCountBuffer.increment(targetId);
+
+            sendLikeNotification(targetId, targetType, user);
         }
     }
 
@@ -61,6 +63,7 @@ public class LikeServiceImpl implements LikeService {
         User receiver;
         NotificationType notificationType;
         Long referenceId;
+        Long targetPostId;
 
         if (targetType == TargetType.POST) {
             Post post = postRepository.findById(targetId)
@@ -68,15 +71,17 @@ public class LikeServiceImpl implements LikeService {
             receiver = post.getUser();
             notificationType = NotificationType.LIKE_POST;
             referenceId = post.getId();
+            targetPostId = post.getId();
         } else {
             Comment comment = commentRepository.findById(targetId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bình luận với id: " + targetId));
             receiver = comment.getUser();
             notificationType = NotificationType.LIKE_COMMENT;
             referenceId = comment.getId();
+            targetPostId = comment.getPost().getId();
         }
 
-        notificationService.createAndSendNotification(receiver, actor, notificationType, referenceId);
+        notificationService.createAndSendNotification(receiver, actor, notificationType, referenceId, targetPostId);
     }
 
     @Override

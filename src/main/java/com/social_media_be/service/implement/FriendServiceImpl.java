@@ -173,7 +173,7 @@ public class FriendServiceImpl implements FriendService {
 
         // Tạo thông báo realtime
         notificationService.createAndSendNotification(receiver, requester, NotificationType.FRIEND_REQUEST,
-                saved.getId());
+                saved.getId(), null);
     }
 
     @Override
@@ -215,7 +215,7 @@ public class FriendServiceImpl implements FriendService {
                 saved.getRequester(),
                 saved.getReceiver(),
                 NotificationType.FRIEND_ACCEPT,
-                saved.getId());
+                saved.getId(), null);
     }
 
     @Override

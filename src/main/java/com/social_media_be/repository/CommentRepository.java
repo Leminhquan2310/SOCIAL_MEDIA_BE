@@ -35,4 +35,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE Comment c SET c.likeCount = GREATEST(0, COALESCE(c.likeCount, 0) - 1) WHERE c.id = :commentId")
     void decrementLikeCount(@org.springframework.data.repository.query.Param("commentId") Long commentId);
+
+    void deleteByPostId(Long postId);
+
+    List<Comment> findAllByPostId(Long postId);
 }

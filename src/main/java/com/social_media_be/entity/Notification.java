@@ -33,6 +33,12 @@ public class Notification {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Column(name = "target_id")
+    private Long targetId;
+
+    @Column(name = "ancestor_ids", columnDefinition = "TEXT")
+    private String ancestorIds;
+
     @Column(name = "actor_count", nullable = false)
     @Builder.Default
     private Integer actorCount = 1;
@@ -50,7 +56,7 @@ public class Notification {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        updatedAt = null;
     }
 
     @PreUpdate

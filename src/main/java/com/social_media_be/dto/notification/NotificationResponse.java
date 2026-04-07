@@ -15,9 +15,11 @@ public class NotificationResponse {
     private UserSummary actor;
     private NotificationType type;
     private Long referenceId;
-    private boolean isRead;
-    private boolean isActionable;
-    private boolean isSilent; // NEW: Nếu true, frontend sẽ không hiện Toast
+    private Long targetId;
+    private String ancestorIds;
+    private Boolean isRead;
+    private Boolean isActionable;
+    private Boolean isSilent; // NEW: Nếu true, frontend sẽ không hiện Toast
     private Integer actorCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt; // Để đồng bộ thời gian mới nhất khi gộp
@@ -33,6 +35,8 @@ public class NotificationResponse {
                         .build())
                 .type(notification.getType())
                 .referenceId(notification.getReferenceId())
+                .targetId(notification.getTargetId())
+                .ancestorIds(notification.getAncestorIds())
                 .isRead(notification.isRead())
                 .isActionable(false)
                 .isSilent(false)

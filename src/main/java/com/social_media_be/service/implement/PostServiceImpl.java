@@ -5,18 +5,18 @@ import com.social_media_be.dto.post.PostImageDto;
 import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.post.PostUpdateRequest;
 import com.social_media_be.dto.user.UserSummary;
+import com.social_media_be.entity.Comment;
 import com.social_media_be.entity.Post;
 import com.social_media_be.entity.PostImage;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.enums.FriendStatus;
+import com.social_media_be.entity.enums.NotificationType;
 import com.social_media_be.entity.enums.Privacy;
 import com.social_media_be.entity.enums.TargetType;
 import com.social_media_be.exception.ResourceNotFoundException;
-import com.social_media_be.repository.FriendshipRepository;
-import com.social_media_be.repository.LikeRepository;
-import com.social_media_be.repository.PostRepository;
-import com.social_media_be.repository.UserRepository;
+import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
+import com.social_media_be.service.NotificationService;
 import com.social_media_be.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +43,9 @@ public class PostServiceImpl implements PostService {
     private final FriendshipRepository friendshipRepository;
     private final CloudinaryService cloudinaryService;
     private final LikeRepository likeRepository;
+    private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
+    private final CommentRepository commentRepository;
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
@@ -269,19 +272,58 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
+        // check quyền xóa
         if (!post.getUser().getId().equals(user.getId())) {
             throw new AccessDeniedException("You don't have permission to delete this post");
         }
 
+        // 1. Thu thập tất cả comment để dọn dẹp
+        List<Comment> comments = commentRepository.findAllByPostId(postId);
+        List<Long> commentIds = comments.stream().map(Comment::getId).collect(Collectors.toList());
+
+        // 2. Xóa ảnh của các comment trên Cloudinary
+        for (Comment comment : comments) {
+            if (comment.getImageUrl() != null) {
+                try {
+                    String publicId = cloudinaryService.extractPublicId(comment.getImageUrl());
+                    if (publicId != null) cloudinaryService.delete(publicId);
+                } catch (Exception e) {
+                    log.error("Failed to delete comment image from Cloudinary: {}", comment.getImageUrl(), e);
+                }
+            }
+        }
+
+        // 3. Xóa ảnh của bài viết trên Cloudinary
         for (PostImage img : post.getImages()) {
             try {
                 String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
                 if (publicId != null) cloudinaryService.delete(publicId);
             } catch (Exception e) {
-                log.error("Failed to delete image from Cloudinary: {}", img.getImageUrl(), e);
+                log.error("Failed to delete post image from Cloudinary: {}", img.getImageUrl(), e);
             }
         }
 
+        // 4. Xóa Lượt thích (Likes)
+        // Xóa like của bài viết
+        likeRepository.deleteByTargetIdAndTargetType(postId, TargetType.POST);
+        // Xóa like của tất cả comment thuộc bài viết
+        if (!commentIds.isEmpty()) {
+            likeRepository.deleteByTargetIdInAndTargetType(commentIds, TargetType.COMMENT);
+        }
+
+        // 5. Xóa Thông báo (Notifications)
+        // Xóa thông báo liên quan đến bài viết (LIKE_POST, COMMENT_POST)
+        notificationService.removeNotificationByPostId(postId);
+        // Xóa thông báo liên quan đến các comment (LIKE_COMMENT, REPLY_COMMENT)
+        if (!commentIds.isEmpty()) {
+            notificationRepository.deleteByReferenceIdInAndTypeIn(
+                    commentIds,
+                    List.of(NotificationType.LIKE_COMMENT, NotificationType.REPLY_COMMENT)
+            );
+        }
+
+        // 6. Xóa dữ liệu trong DB
+        commentRepository.deleteByPostId(postId);
         postRepository.delete(post);
     }
 
@@ -317,5 +359,11 @@ public class PostServiceImpl implements PostService {
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.searchFeedPosts(user.getId(), keyword, lastPostId, pageable);
         return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
+    }
+
+    @Override
+    public PostResponse getPostById(Long postId, Long currentUser) {
+        Post post = postRepository.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post id not found"));
+        return mapToResponse(post, currentUser);
     }
 }

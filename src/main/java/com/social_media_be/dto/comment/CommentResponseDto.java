@@ -13,6 +13,7 @@ public class CommentResponseDto {
     
     private Long authorId;
     private String authorName;
+    private String authorUsername;
     private String authorAvatar;
     
     private String content;
@@ -22,9 +23,11 @@ public class CommentResponseDto {
     
     private Long parentCommentId;
     private String parentCommentName;
+    private String parentCommentUsername;
     
     // Thống kê bình luận
     private long likeCount;
     private boolean isLiked;
     private long replyCount;
+    private boolean edited;
 }

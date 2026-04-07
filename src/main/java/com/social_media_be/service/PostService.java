@@ -14,4 +14,5 @@ public interface PostService {
     List<PostResponse> getNewsFeed(Long userId, Long lastPostId, int limit);
     List<PostResponse> getUserPosts(Long targetUserId, Long currentUserId, Long lastPostId, int limit);
     List<PostResponse> searchPosts(String keyword, Long userId, Long lastPostId, int limit);
+    PostResponse getPostById(Long postId, Long currentUser);
 }
