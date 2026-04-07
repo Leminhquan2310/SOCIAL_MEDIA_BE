@@ -100,15 +100,4 @@ public class UserController {
         String newAvatarUrl = userService.updateAvatar(userPrincipal.getId(), file);
         return ResponseEntity.ok(ApiResponse.success(newAvatarUrl));
     }
-
-//    @GetMapping("/seach")
-//    public ResponseEntity<?> searchUser(
-//            @RequestParam String q,
-//            @RequestParam(required = false) Long lastPostId,
-//            @RequestParam(defaultValue = "10") int limit,
-//            @AuthenticationPrincipal UserPrincipal userPrincipal
-//    ){
-//        List<UserSummary> response = userService.searchUsers(q, userPrincipal.getId(), lastPostId, limit);
-//        return ResponseEntity.ok(response);
-//    }
 }

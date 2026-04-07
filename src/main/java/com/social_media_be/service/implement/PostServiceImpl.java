@@ -5,16 +5,18 @@ import com.social_media_be.dto.post.PostImageDto;
 import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.post.PostUpdateRequest;
 import com.social_media_be.dto.user.UserSummary;
+import com.social_media_be.entity.Comment;
 import com.social_media_be.entity.Post;
 import com.social_media_be.entity.PostImage;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.enums.FriendStatus;
+import com.social_media_be.entity.enums.NotificationType;
 import com.social_media_be.entity.enums.Privacy;
+import com.social_media_be.entity.enums.TargetType;
 import com.social_media_be.exception.ResourceNotFoundException;
-import com.social_media_be.repository.FriendshipRepository;
-import com.social_media_be.repository.PostRepository;
-import com.social_media_be.repository.UserRepository;
+import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
+import com.social_media_be.service.NotificationService;
 import com.social_media_be.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,13 +42,17 @@ public class PostServiceImpl implements PostService {
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final CloudinaryService cloudinaryService;
+    private final LikeRepository likeRepository;
+    private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
+    private final CommentRepository commentRepository;
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
-    private PostResponse mapToResponse(Post post) {
+    private PostResponse mapToResponse(Post post, Long currentUserId) {
         UserSummary author = UserSummary.builder()
                 .id(post.getUser().getId())
                 .username(post.getUser().getUsername())
@@ -67,6 +73,9 @@ public class PostServiceImpl implements PostService {
                         .build())
                 .collect(Collectors.toList());
 
+        boolean isLiked = currentUserId != null &&
+                likeRepository.existsByUserIdAndTargetIdAndTargetType(currentUserId, post.getId(), TargetType.POST);
+
         return PostResponse.builder()
                 .id(post.getId())
                 .content(post.getContent())
@@ -74,8 +83,9 @@ public class PostServiceImpl implements PostService {
                 .feeling(post.getFeeling())
                 .author(author)
                 .images(imageDtos)
-                .likeCount(0) // TODO: implement likes
-                .commentCount(0) // TODO: implement comments
+                .likeCount(post.getLikeCount() != null ? post.getLikeCount() : 0)
+                .commentCount(post.getCommentCount() != null ? post.getCommentCount() : 0)
+                .isLiked(isLiked)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
@@ -114,7 +124,7 @@ public class PostServiceImpl implements PostService {
         }
 
         Post savedPost = postRepository.save(post);
-        return mapToResponse(savedPost);
+        return mapToResponse(savedPost, userId);
     }
 
     @Override
@@ -123,7 +133,7 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.findUserPosts(user.getId(), lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
     }
 
     @Override
@@ -180,7 +190,7 @@ public class PostServiceImpl implements PostService {
         // Handle Reordering and New Image Integration
         if (request.getImageOrder() != null && !request.getImageOrder().isEmpty()) {
             List<PostImage> currentImages = post.getImages();
-            
+
             // To track which new image is which: filter those without ID (newly added at line 171)
             List<PostImage> newAddedImages = currentImages.stream()
                 .filter(img -> img.getId() == null)
@@ -214,7 +224,7 @@ public class PostServiceImpl implements PostService {
                     } catch (NumberFormatException ignored) {}
                 }
             }
-            
+
             // Safety check: Keep any existing images that weren't in the ordering list but weren't marked for deletion
             for (PostImage img : currentImages) {
                 if (!orderedList.contains(img)) {
@@ -229,13 +239,13 @@ public class PostServiceImpl implements PostService {
                 .filter(img -> !orderedList.contains(img))
                 .collect(Collectors.toList());
             currentImages.removeAll(toRemove);
-            
+
             // Add any that are in orderedList but not in currentImages (should be none because we added them all at 171)
             // But we actually want to ensure the orderIndex is updated. The objects are the same, so it's already updated.
         }
 
         Post savedPost = postRepository.save(post);
-        return mapToResponse(savedPost);
+        return mapToResponse(savedPost, userId);
     }
 
     private void validateImage(MultipartFile file) {
@@ -243,8 +253,8 @@ public class PostServiceImpl implements PostService {
             throw new IllegalArgumentException("Image file is empty");
         }
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("image/jpeg") && 
-                                   !contentType.equals("image/png") && 
+        if (contentType == null || (!contentType.equals("image/jpeg") &&
+                                   !contentType.equals("image/png") &&
                                    !contentType.equals("image/webp"))) {
             throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
         }
@@ -262,19 +272,58 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
+        // check quyền xóa
         if (!post.getUser().getId().equals(user.getId())) {
             throw new AccessDeniedException("You don't have permission to delete this post");
         }
 
+        // 1. Thu thập tất cả comment để dọn dẹp
+        List<Comment> comments = commentRepository.findAllByPostId(postId);
+        List<Long> commentIds = comments.stream().map(Comment::getId).collect(Collectors.toList());
+
+        // 2. Xóa ảnh của các comment trên Cloudinary
+        for (Comment comment : comments) {
+            if (comment.getImageUrl() != null) {
+                try {
+                    String publicId = cloudinaryService.extractPublicId(comment.getImageUrl());
+                    if (publicId != null) cloudinaryService.delete(publicId);
+                } catch (Exception e) {
+                    log.error("Failed to delete comment image from Cloudinary: {}", comment.getImageUrl(), e);
+                }
+            }
+        }
+
+        // 3. Xóa ảnh của bài viết trên Cloudinary
         for (PostImage img : post.getImages()) {
             try {
                 String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
                 if (publicId != null) cloudinaryService.delete(publicId);
             } catch (Exception e) {
-                log.error("Failed to delete image from Cloudinary: {}", img.getImageUrl(), e);
+                log.error("Failed to delete post image from Cloudinary: {}", img.getImageUrl(), e);
             }
         }
 
+        // 4. Xóa Lượt thích (Likes)
+        // Xóa like của bài viết
+        likeRepository.deleteByTargetIdAndTargetType(postId, TargetType.POST);
+        // Xóa like của tất cả comment thuộc bài viết
+        if (!commentIds.isEmpty()) {
+            likeRepository.deleteByTargetIdInAndTargetType(commentIds, TargetType.COMMENT);
+        }
+
+        // 5. Xóa Thông báo (Notifications)
+        // Xóa thông báo liên quan đến bài viết (LIKE_POST, COMMENT_POST)
+        notificationService.removeNotificationByPostId(postId);
+        // Xóa thông báo liên quan đến các comment (LIKE_COMMENT, REPLY_COMMENT)
+        if (!commentIds.isEmpty()) {
+            notificationRepository.deleteByReferenceIdInAndTypeIn(
+                    commentIds,
+                    List.of(NotificationType.LIKE_COMMENT, NotificationType.REPLY_COMMENT)
+            );
+        }
+
+        // 6. Xóa dữ liệu trong DB
+        commentRepository.deleteByPostId(postId);
         postRepository.delete(post);
     }
 
@@ -284,14 +333,14 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.findNewsFeedPosts(user.getId(), lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PostResponse> getUserPosts(Long targetUserId, Long currentUserId, Long lastPostId, int limit) {
         Pageable pageable = PageRequest.of(0, limit);
-        
+
         if (currentUserId != null && currentUserId.equals(targetUserId)) {
             return getMyPosts(currentUserId, lastPostId, limit);
         }
@@ -300,7 +349,7 @@ public class PostServiceImpl implements PostService {
         List<Privacy> allowedPrivacies = isFriend ? List.of(Privacy.PUBLIC, Privacy.FRIEND_ONLY) : List.of(Privacy.PUBLIC);
 
         List<Post> posts = postRepository.findUserPostsWithPrivacy(targetUserId, allowedPrivacies, lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, currentUserId)).collect(Collectors.toList());
     }
 
     @Override
@@ -309,6 +358,12 @@ public class PostServiceImpl implements PostService {
         User user = getUserById(userId);
         Pageable pageable = PageRequest.of(0, limit);
         List<Post> posts = postRepository.searchFeedPosts(user.getId(), keyword, lastPostId, pageable);
-        return posts.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return posts.stream().map(p -> mapToResponse(p, userId)).collect(Collectors.toList());
+    }
+
+    @Override
+    public PostResponse getPostById(Long postId, Long currentUser) {
+        Post post = postRepository.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post id not found"));
+        return mapToResponse(post, currentUser);
     }
 }

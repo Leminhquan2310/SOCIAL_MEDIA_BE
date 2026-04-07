@@ -33,6 +33,16 @@ public class Notification {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    @Column(name = "target_id")
+    private Long targetId;
+
+    @Column(name = "ancestor_ids", columnDefinition = "TEXT")
+    private String ancestorIds;
+
+    @Column(name = "actor_count", nullable = false)
+    @Builder.Default
+    private Integer actorCount = 1;
+
     @Column(name = "is_read", nullable = false)
     @Builder.Default
     private boolean isRead = false;
@@ -40,8 +50,17 @@ public class Notification {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = null;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

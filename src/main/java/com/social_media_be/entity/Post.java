@@ -46,6 +46,14 @@ public class Post {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "like_count")
+    @Builder.Default
+    private Integer likeCount = 0;
+
+    @Column(name = "comment_count")
+    @Builder.Default
+    private Integer commentCount = 0;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
