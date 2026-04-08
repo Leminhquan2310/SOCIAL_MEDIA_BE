@@ -125,6 +125,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/username/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/user/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/friends/status/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/ws-notifications/**").permitAll()
                         .anyRequest().authenticated()
                 )
