@@ -46,6 +46,7 @@ public class SecurityConfig {
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
     private final JWTService jwtService;
     private final CustomUserDetailsService customUserDetailsService;
+    private final com.social_media_be.repository.TokenBlacklistRepository tokenBlacklistRepository;
 
     @Bean
     public HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository() {
@@ -54,7 +55,7 @@ public class SecurityConfig {
 
     @Bean
     public JWTAuthenticationFilter jwtAuthenticationFilter() {
-        return new JWTAuthenticationFilter(jwtService, customUserDetailsService);
+        return new JWTAuthenticationFilter(jwtService, customUserDetailsService, tokenBlacklistRepository);
     }
 
     @Bean

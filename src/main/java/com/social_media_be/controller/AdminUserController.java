@@ -24,8 +24,7 @@ public class AdminUserController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction,
-            @RequestParam(required = false) String keyword
-    ) {
+            @RequestParam(required = false) String keyword) {
         Sort sort = Sort.by(direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
 
@@ -37,5 +36,18 @@ public class AdminUserController {
     public ResponseEntity<?> getUserById(@PathVariable Long id) {
         AdminUserResponseDto user = adminUserService.getUserById(id);
         return ResponseEntity.ok(ApiResponse.success(user));
+    }
+
+    @PostMapping("/{id}/ban")
+    public ResponseEntity<?> banUser(@PathVariable Long id, @RequestBody java.util.Map<String, String> request) {
+        String reason = request.get("reason");
+        adminUserService.banUser(id, reason);
+        return ResponseEntity.ok(ApiResponse.success("Banned account successfully"));
+    }
+
+    @PostMapping("/{id}/unban")
+    public ResponseEntity<?> unbanUser(@PathVariable Long id) {
+        adminUserService.unbanUser(id);
+        return ResponseEntity.ok(ApiResponse.success("Unbanned account successfully"));
     }
 }

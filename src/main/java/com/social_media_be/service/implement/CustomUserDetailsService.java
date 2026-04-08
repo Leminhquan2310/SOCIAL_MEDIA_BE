@@ -3,6 +3,7 @@ package com.social_media_be.service.implement;
 import com.social_media_be.entity.User;
 import com.social_media_be.entity.UserPrincipal;
 import com.social_media_be.entity.enums.AuthProvider;
+import org.springframework.security.authentication.DisabledException;
 import com.social_media_be.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,14 +24,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByAuthProviderAndProviderId(AuthProvider.LOCAL, username)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "User not found with identify: " + username
-                ));
+                        "User not found with identify: " + username));
 
-        // Check if user is enabled
-        if (!user.isEnabled()) {
-            throw new UsernameNotFoundException("User account is disabled");
-        }
-
+        // Delegating account lock/disable checks to Spring Security's UserPrincipal
+        // object
         return UserPrincipal.build(user);
     }
 
@@ -38,11 +35,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "User not found with id: " + id
-                ));
+                        "User not found with id: " + id));
 
         if (!user.isEnabled()) {
-            throw new UsernameNotFoundException("User account is disabled");
+            throw new DisabledException("User account is banned or removed");
         }
 
         return UserPrincipal.build(user);

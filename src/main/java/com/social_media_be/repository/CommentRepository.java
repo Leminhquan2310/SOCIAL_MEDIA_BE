@@ -12,13 +12,15 @@ import java.util.List;
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     // Tìm các comment gốc (không có parent) của 1 bài viết, hỗ trợ phân trang
-    Page<Comment> findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(Long postId, Pageable pageable);
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM Comment c WHERE c.post.id = :postId AND c.parentComment IS NULL AND c.user.enabled = true ORDER BY c.createdAt DESC")
+    Page<Comment> findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(@org.springframework.data.repository.query.Param("postId") Long postId, Pageable pageable);
     
     // Tìm các comment gốc theo cursor (nếu muốn dùng cursor pagination)
     List<Comment> findByPostIdAndParentCommentIsNullOrIdLessThanOrderByCreatedAtDesc(Long postId, Long lastId, Pageable pageable);
 
     // Lấy tất cả reply của 1 comment gốc (xếp theo thời gian tăng dần)
-    List<Comment> findByParentCommentIdOrderByCreatedAtAsc(Long parentCommentId);
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM Comment c WHERE c.parentComment.id = :parentCommentId AND c.user.enabled = true ORDER BY c.createdAt ASC")
+    List<Comment> findByParentCommentIdOrderByCreatedAtAsc(@org.springframework.data.repository.query.Param("parentCommentId") Long parentCommentId);
 
     // Đếm số reply của 1 comment gốc (tránh N+1)
     long countByParentCommentId(Long parentCommentId);

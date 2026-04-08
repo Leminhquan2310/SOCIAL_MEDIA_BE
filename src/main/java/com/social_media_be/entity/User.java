@@ -99,6 +99,12 @@ public class User {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
+  @Column(name = "ban_reason", length = 500)
+  private String banReason;
+
+  @Column(name = "banned_at")
+  private LocalDateTime bannedAt;
+
 
   @PrePersist
   protected void onCreate() {
