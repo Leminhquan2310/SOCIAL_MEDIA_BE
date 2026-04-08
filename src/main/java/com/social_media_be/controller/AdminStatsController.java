@@ -33,4 +33,11 @@ public class AdminStatsController {
         List<VisitStatDto> stats = adminStatsService.getVisitStats(range);
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
+
+    @GetMapping("/new-users")
+    public ResponseEntity<?> getNewUserStats(
+            @RequestParam(defaultValue = "week") String range) {
+        List<com.social_media_be.dto.admin.NewUserStatDto> stats = adminStatsService.getNewUserStats(range);
+        return ResponseEntity.ok(ApiResponse.success(stats));
+    }
 }

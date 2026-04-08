@@ -1,8 +1,10 @@
 package com.social_media_be.service.implement;
 
+import com.social_media_be.dto.admin.NewUserStatDto;
 import com.social_media_be.dto.admin.VisitStatDto;
 import com.social_media_be.entity.AppAccessStat;
 import com.social_media_be.repository.AppAccessStatRepository;
+import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.AdminStatsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class AdminStatsServiceImpl implements AdminStatsService {
 
     private final AppAccessStatRepository accessStatRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,6 +45,36 @@ public class AdminStatsServiceImpl implements AdminStatsService {
             result.add(VisitStatDto.builder()
                     .date(cursor)
                     .visitCount(statMap.getOrDefault(cursor, 0L))
+                    .build());
+            cursor = cursor.plusDays(1);
+        }
+
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<NewUserStatDto> getNewUserStats(String range) {
+        LocalDate today = LocalDate.now();
+        LocalDate from = switch (range.toLowerCase()) {
+            case "month" -> today.minusDays(29);
+            case "year"  -> today.minusDays(364);
+            default      -> today.minusDays(6); // week (7 days)
+        };
+
+        List<Object[]> rawStats = userRepository.countNewUsersByDateRange(from, today);
+        Map<LocalDate, Long> statMap = rawStats.stream()
+                .collect(Collectors.toMap(
+                        row -> (LocalDate) row[0],
+                        row -> ((Number) row[1]).longValue()
+                ));
+
+        List<NewUserStatDto> result = new ArrayList<>();
+        LocalDate cursor = from;
+        while (!cursor.isAfter(today)) {
+            result.add(NewUserStatDto.builder()
+                    .date(cursor)
+                    .newUserCount(statMap.getOrDefault(cursor, 0L))
                     .build());
             cursor = cursor.plusDays(1);
         }
