@@ -77,4 +77,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("lastMutualCount") Integer lastMutualCount,
             @Param("lastId") Long lastId,
             @Param("limit") int limit);
+
+    @Query("SELECT CAST(u.createdAt AS LocalDate) as date, COUNT(u.id) as count " +
+           "FROM User u " +
+           "WHERE CAST(u.createdAt AS LocalDate) BETWEEN :from AND :to " +
+           "AND u.id NOT IN (SELECT ur.id FROM User ur JOIN ur.roles r WHERE r.name = 'ROLE_ADMIN') " +
+           "GROUP BY CAST(u.createdAt AS LocalDate) " +
+           "ORDER BY CAST(u.createdAt AS LocalDate) ASC")
+    List<Object[]> countNewUsersByDateRange(@Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
 }
