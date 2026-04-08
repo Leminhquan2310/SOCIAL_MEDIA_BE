@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     boolean existsByUsername(String username);
 
+    Page<User> findByUsernameContainingIgnoreCaseOrFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String username, String fullName, String email, Pageable pageable);
+
     @Query(value = "SELECT u.* FROM users u " +
            "WHERE u.id != :currentUserId " +
            "AND u.id NOT IN (" +
@@ -30,6 +32,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "  UNION " +
            "  SELECT f.receiver_id FROM friendships f WHERE f.requester_id = :currentUserId" +
            ") " +
+           "AND u.id NOT IN (SELECT ur.user_id FROM user_role ur JOIN roles r ON ur.role_id = r.id WHERE r.name = 'ROLE_ADMIN') " +
            "ORDER BY RAND() ",
            countQuery = "SELECT COUNT(*) FROM users u " +
            "WHERE u.id != :currentUserId " +
@@ -37,7 +40,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "  SELECT f.requester_id FROM friendships f WHERE f.receiver_id = :currentUserId " +
            "  UNION " +
            "  SELECT f.receiver_id FROM friendships f WHERE f.requester_id = :currentUserId" +
-           ")",
+           ") " +
+           "AND u.id NOT IN (SELECT ur.user_id FROM user_role ur JOIN roles r ON ur.role_id = r.id WHERE r.name = 'ROLE_ADMIN')",
            nativeQuery = true)
     Page<User> findFriendSuggestions(@Param("currentUserId") Long currentUserId, Pageable pageable);
 
@@ -56,6 +60,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "  ) as m) as mutual_count " +
            "  FROM users u " +
            "  WHERE u.id != :currentUserId " +
+           "  AND u.id NOT IN (SELECT ur.user_id FROM user_role ur JOIN roles r ON ur.role_id = r.id WHERE r.name = 'ROLE_ADMIN') " +
            "  AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(u.full_name) LIKE LOWER(CONCAT('%', :query, '%'))) " +
            ") as result " +
            "WHERE (:lastExactMatch IS NULL OR " +
