@@ -34,8 +34,10 @@ public class AuthController {
 
   @PostMapping("/register")
   public ResponseEntity<ApiResponse<RegisterResponse>> register(
-    @Valid @RequestBody RegisterRequest request) {
-    RegisterResponse response = authService.register(request);
+    @Valid @RequestBody RegisterRequest request,
+    jakarta.servlet.http.HttpServletRequest httpRequest) {
+    String clientIp = getClientIp(httpRequest);
+    RegisterResponse response = authService.register(request, clientIp);
     return ResponseEntity
       .status(HttpStatus.CREATED)
       .body(ApiResponse.created(response));
@@ -102,8 +104,15 @@ public class AuthController {
   }
 
   private void addRefreshTokenCookie(jakarta.servlet.http.HttpServletResponse response, String refreshToken) {
-    // Thời gian sống của cookie (nên lấy từ config, ở đây dùng tạm 30 ngày tương đương RT)
     int maxAge = 30 * 24 * 60 * 60;
     com.social_media_be.utils.CookieUtils.addCookie(response, "refreshToken", refreshToken, maxAge);
+  }
+
+  private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
+    String forwarded = request.getHeader("X-Forwarded-For");
+    if (forwarded != null && !forwarded.isBlank()) {
+      return forwarded.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
   }
 }

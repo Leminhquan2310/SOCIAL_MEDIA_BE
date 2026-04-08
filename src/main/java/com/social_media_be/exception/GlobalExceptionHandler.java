@@ -202,6 +202,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
+    // ========== Rate Limit Exceptions ==========
+
+    /**
+     * Handle TooManyRequestsException (Rate limit exceeded)
+     */
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTooManyRequestsException(
+            TooManyRequestsException ex,
+            HttpServletRequest request) {
+
+        log.warn("TooManyRequestsException: {} - URI: {}", ex.getMessage(), request.getRequestURI());
+
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.TOO_MANY_REQUESTS.value())
+                .message("TOO_MANY_REQUESTS")
+                .data(buildErrorDetails(ex.getMessage(), request.getRequestURI()))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
+    }
+
     // ========== Business Logic Exceptions ==========
 
     /**

@@ -11,9 +11,11 @@ import com.social_media_be.entity.enums.Privacy;
 import com.social_media_be.entity.enums.TargetType;
 import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
+import com.social_media_be.exception.TooManyRequestsException;
 import com.social_media_be.exception.UnauthorizedException;
 import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
+import com.social_media_be.service.CommentRateLimiter;
 import com.social_media_be.service.CommentService;
 import com.social_media_be.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -40,10 +42,16 @@ public class CommentServiceImpl implements CommentService {
     private final EntityCountServiceImpl entityCountService;
     private final CloudinaryService cloudinaryService;
     private final NotificationRepository notificationRepository;
+    private final CommentRateLimiter commentRateLimiter;
 
     @Override
     @Transactional
     public CommentResponseDto createComment(Long postId, CommentRequestDto request, Long userId) {
+        // Rate limit check: prevent comment spam
+        if (!commentRateLimiter.isAllowed(userId)) {
+            throw new TooManyRequestsException("Bạn đang bình luận quá nhanh. Vui lòng chờ một chút trước khi tiếp tục.");
+        }
+
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bài viết với id: " + postId));
         User user = userRepository.findById(userId)

@@ -49,7 +49,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public RegisterResponse register(RegisterRequest request) {
+    public RegisterResponse register(RegisterRequest request, String registrationIp) {
         log.info("Registering new user: {}", request.getUsername());
 
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -65,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
         user.setFullName(request.getFullName());
         user.setAvatarUrl(defaultAvatarUrl);
         user.setEnabled(true);
+        user.setRegistrationIp(registrationIp);
 
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new RuntimeException("Error: Role USER not found"));

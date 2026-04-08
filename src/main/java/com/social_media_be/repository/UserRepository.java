@@ -85,4 +85,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "GROUP BY CAST(u.createdAt AS LocalDate) " +
            "ORDER BY CAST(u.createdAt AS LocalDate) ASC")
     List<Object[]> countNewUsersByDateRange(@Param("from") java.time.LocalDate from, @Param("to") java.time.LocalDate to);
+
+    // Phát hiện spam: IP có từ :threshold account trở lên trong :hours giờ gần nhất
+    @Query(value = "SELECT u.registration_ip AS ip, COUNT(*) AS accountCount " +
+           "FROM users u " +
+           "WHERE u.registration_ip IS NOT NULL " +
+           "AND u.created_at >= :since " +
+           "GROUP BY u.registration_ip " +
+           "HAVING COUNT(*) >= :threshold " +
+           "ORDER BY accountCount DESC",
+           nativeQuery = true)
+    List<Object[]> findSuspiciousIps(
+            @Param("since") java.time.LocalDateTime since,
+            @Param("threshold") int threshold);
+
+    // Lấy danh sách user theo IP đăng ký
+    @Query("SELECT u FROM User u WHERE u.registrationIp = :ip ORDER BY u.createdAt ASC")
+    List<User> findByRegistrationIp(@Param("ip") String ip);
 }
