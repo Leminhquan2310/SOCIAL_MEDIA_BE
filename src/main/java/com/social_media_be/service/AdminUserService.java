@@ -7,4 +7,6 @@ import org.springframework.data.domain.Pageable;
 public interface AdminUserService {
     Page<AdminUserResponseDto> getAllUsers(Pageable pageable, String keyword);
     AdminUserResponseDto getUserById(Long id);
+    void banUser(Long id, String reason);
+    void unbanUser(Long id);
 }

@@ -1,5 +1,6 @@
 package com.social_media_be.entity;
 
+import com.social_media_be.entity.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
@@ -90,7 +91,7 @@ public class UserPrincipal implements UserDetails, OAuth2User {
 
   @Override
   public boolean isAccountNonLocked() {
-    return true;
+    return enabled;
   }
 
   @Override

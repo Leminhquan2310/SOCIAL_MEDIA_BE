@@ -30,18 +30,23 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
   private final JWTService jwtService;
   private final CustomUserDetailsService customUserDetailsService;
-
+  private final com.social_media_be.repository.TokenBlacklistRepository tokenBlacklistRepository;
 
   @Override
   protected void doFilterInternal(
-    HttpServletRequest request,
-    HttpServletResponse response,
-    FilterChain filterChain) throws ServletException, IOException {
+      HttpServletRequest request,
+      HttpServletResponse response,
+      FilterChain filterChain) throws ServletException, IOException {
 
     try {
       String jwt = extractJwtFromRequest(request);
 
       if (StringUtils.hasText(jwt)) {
+        if (tokenBlacklistRepository.existsById(jwt)) {
+          sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_BLACKLISTED",
+              "Account already banned or token expired");
+          return;
+        }
         // ✅ Decode userId directly
         Long userId = jwtService.getUserIdFromToken(jwt);
 
@@ -54,7 +59,8 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
       }
     } catch (ExpiredJwtException e) {
       log.warn("JWT token expired: {}", e.getMessage());
-      sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_EXPIRED", "Token đã hết hạn, vui lòng đăng nhập lại");
+      sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_EXPIRED",
+          "Token đã hết hạn, vui lòng đăng nhập lại");
       return; // ❗ return luôn, không gọi filterChain nữa
     } catch (Exception e) {
       log.error("Cannot set user authentication: {}", e.getMessage());
@@ -65,25 +71,23 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private void sendErrorResponse(HttpServletResponse response, int status, String errorCode, String message) throws IOException {
+  private void sendErrorResponse(HttpServletResponse response, int status, String errorCode, String message)
+      throws IOException {
     response.setStatus(status);
     response.setContentType("application/json;charset=UTF-8");
     response.getWriter().write(String.format(
-      "{\"status\": %d, \"error\": \"%s\", \"message\": \"%s\"}",
-      status, errorCode, message
-    ));
+        "{\"status\": %d, \"error\": \"%s\", \"message\": \"%s\"}",
+        status, errorCode, message));
   }
 
   /**
    * Create authentication and set to SecurityContext
    */
   private void authenticateUser(UserDetails userDetails, HttpServletRequest request) {
-    UsernamePasswordAuthenticationToken authentication =
-      new UsernamePasswordAuthenticationToken(
+    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
         userDetails,
         null,
-        userDetails.getAuthorities()
-      );
+        userDetails.getAuthorities());
 
     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
     SecurityContextHolder.getContext().setAuthentication(authentication);

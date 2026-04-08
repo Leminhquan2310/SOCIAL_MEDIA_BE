@@ -14,16 +14,17 @@ import java.util.List;
 public interface PostRepository extends JpaRepository<Post, Long> {
 
        // Lấy bài viết của chính mình
-       @Query("SELECT p FROM Post p WHERE p.user.id = :userId AND (:lastPostId IS NULL OR p.id < :lastPostId) ORDER BY p.createdAt DESC")
+       @Query("SELECT p FROM Post p WHERE p.user.id = :userId AND p.user.enabled = true AND (:lastPostId IS NULL OR p.id < :lastPostId) ORDER BY p.createdAt DESC")
        List<Post> findUserPosts(@Param("userId") Long userId, @Param("lastPostId") Long lastPostId, Pageable pageable);
 
        // Lấy bài viết của một user khác kèm theo filter Privacy
-       @Query("SELECT p FROM Post p WHERE p.user.id = :userId AND p.privacy IN :privacies AND (:lastPostId IS NULL OR p.id < :lastPostId) ORDER BY p.createdAt DESC")
+       @Query("SELECT p FROM Post p WHERE p.user.id = :userId AND p.user.enabled = true AND p.privacy IN :privacies AND (:lastPostId IS NULL OR p.id < :lastPostId) ORDER BY p.createdAt DESC")
        List<Post> findUserPostsWithPrivacy(@Param("userId") Long userId, @Param("privacies") List<Privacy> privacies,
                      @Param("lastPostId") Long lastPostId, Pageable pageable);
 
        // Lấy Newsfeed
        @Query("SELECT p FROM Post p WHERE " +
+                     "p.user.enabled = true AND " +
                      "(:lastPostId IS NULL OR p.id < :lastPostId) AND " +
                      "(p.user.id = :userId OR " +
                      " p.privacy = 'PUBLIC' OR " +
@@ -39,6 +40,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
        // Tìm kiếm toàn cục tương tự điều kiện Newsfeed
        @Query("SELECT p FROM Post p WHERE " +
+                     "p.user.enabled = true AND " +
                      "(:lastPostId IS NULL OR p.id < :lastPostId) AND " +
                      "(LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
                      "(p.user.id = :userId OR " +
