@@ -15,4 +15,5 @@ public interface PostService {
     List<PostResponse> getUserPosts(Long targetUserId, Long currentUserId, Long lastPostId, int limit);
     List<PostResponse> searchPosts(String keyword, Long userId, Long lastPostId, int limit);
     PostResponse getPostById(Long postId, Long currentUser);
+    void reportPost(Long postId, Long userId, com.social_media_be.dto.post.PostReportRequest request);
 }

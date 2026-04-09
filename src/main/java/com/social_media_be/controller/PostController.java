@@ -88,4 +88,13 @@ public class PostController {
         List<PostResponse> response = postService.searchPosts(q, userPrincipal.getId(), lastPostId, limit);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{postId}/report")
+    public ResponseEntity<Void> reportPost(
+            @PathVariable Long postId,
+            @RequestBody com.social_media_be.dto.post.PostReportRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        postService.reportPost(postId, userPrincipal.getId(), request);
+        return ResponseEntity.ok().build();
+    }
 }

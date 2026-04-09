@@ -54,6 +54,10 @@ public class Post {
     @Builder.Default
     private Integer commentCount = 0;
 
+    @Column(name = "report_count")
+    @Builder.Default
+    private Integer reportCount = 0;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -3,6 +3,7 @@ package com.social_media_be.service.implement;
 import com.social_media_be.dto.admin.AdminUserResponseDto;
 import com.social_media_be.dto.admin.SuspectIpDto;
 import com.social_media_be.entity.User;
+import com.social_media_be.repository.IpBlacklistRepository;
 import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.SuspectService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.List;
 public class SuspectServiceImpl implements SuspectService {
 
     private final UserRepository userRepository;
+    private final IpBlacklistRepository ipBlacklistRepository;
 
     @Override
     public List<SuspectIpDto> getSuspiciousIps(int threshold, int windowHours) {
@@ -39,6 +41,7 @@ public class SuspectServiceImpl implements SuspectService {
             result.add(SuspectIpDto.builder()
                     .ip(ip)
                     .accountCount(count)
+                    .blocked(ipBlacklistRepository.existsByIpAddress(ip))
                     .accounts(accountDtos)
                     .build());
         }

@@ -204,14 +204,48 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public Page<CommentResponseDto> getCommentsByPost(Long postId, Long userId, Pageable pageable) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay bai viet voi id: " + postId));
+        validateCommentVisibility(post, userId);
         Page<Comment> comments = commentRepository.findByPostIdAndParentCommentIsNullOrderByCreatedAtDesc(postId, pageable);
         return comments.map(c -> mapToResponseDto(c, userId));
     }
 
     @Override
     public List<CommentResponseDto> getReplies(Long parentCommentId, Long userId) {
+        Comment parentComment = commentRepository.findById(parentCommentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay binh luan voi id: " + parentCommentId));
+        validateCommentVisibility(parentComment.getPost(), userId);
         List<Comment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(parentCommentId);
         return replies.stream().map(c -> mapToResponseDto(c, userId)).collect(Collectors.toList());
+    }
+
+    private void validateCommentVisibility(Post post, Long userId) {
+        Long postOwnerId = post.getUser().getId();
+
+        if (post.getPrivacy() == Privacy.HIDDEN) {
+            throw new ResourceNotFoundException("Khong tim thay bai viet voi id: " + post.getId());
+        }
+
+        if (userId != null && postOwnerId.equals(userId)) {
+            return;
+        }
+
+        if (post.getPrivacy() == Privacy.PUBLIC) {
+            return;
+        }
+
+        if (post.getPrivacy() == Privacy.ONLY_ME) {
+            throw new ResourceNotFoundException("Khong tim thay bai viet voi id: " + post.getId());
+        }
+
+        if (post.getPrivacy() == Privacy.FRIEND_ONLY) {
+            boolean isFriend = userId != null
+                    && friendshipRepository.existsByUsersAndStatus(postOwnerId, userId, FriendStatus.ACCEPTED);
+            if (!isFriend) {
+                throw new ResourceNotFoundException("Khong tim thay bai viet voi id: " + post.getId());
+            }
+        }
     }
 
     private void validateCommentPermission(Post post, User user) {
@@ -221,7 +255,7 @@ public class CommentServiceImpl implements CommentService {
         if (postOwnerId.equals(viewerId)) return; // Chủ bài viết luôn được comment
 
         Privacy privacy = post.getPrivacy();
-        if (privacy == Privacy.ONLY_ME) {
+        if (privacy == Privacy.ONLY_ME || privacy == Privacy.HIDDEN) {
             throw new BadRequestException("Bài viết này không cho phép người khác bình luận");
         }
 

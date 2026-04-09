@@ -14,5 +14,6 @@ import java.util.List;
 public class SuspectIpDto {
     private String ip;
     private long accountCount;
+    private boolean blocked;
     private List<AdminUserResponseDto> accounts;
 }
