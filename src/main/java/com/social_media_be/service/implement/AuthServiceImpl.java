@@ -11,6 +11,7 @@ import com.social_media_be.repository.RefreshTokenRepository;
 import com.social_media_be.repository.RoleRepository;
 import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.AuthService;
+import com.social_media_be.service.IpBlacklistService;
 import com.social_media_be.service.JWTService;
 import com.social_media_be.service.RefreshTokenService;  // ✅ THÊM
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserDetailsService userDetailsService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenService refreshTokenService;
+    private final IpBlacklistService ipBlacklistService;
 
     @Value("${app.avatar.default-url}")
     private String defaultAvatarUrl;
@@ -49,8 +51,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public RegisterResponse register(RegisterRequest request) {
-        log.info("Registering new user: {}", request.getUsername());
+    public RegisterResponse register(RegisterRequest request, String registrationIp) {
+        log.info("Registering new user: {} from IP: {}", request.getUsername(), registrationIp);
+
+        // Check if IP is blacklisted
+        if (ipBlacklistService.isIpBlacklisted(registrationIp)) {
+            log.warn("Blocked registration attempt from blacklisted IP: {}", registrationIp);
+            throw new BadRequestException("Your network address has been denied account registration due to a violation of our policy.");
+        }
 
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new BadRequestException("Username is already taken");
@@ -65,6 +73,7 @@ public class AuthServiceImpl implements AuthService {
         user.setFullName(request.getFullName());
         user.setAvatarUrl(defaultAvatarUrl);
         user.setEnabled(true);
+        user.setRegistrationIp(registrationIp);
 
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new RuntimeException("Error: Role USER not found"));

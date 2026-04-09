@@ -5,14 +5,12 @@ import com.social_media_be.dto.post.PostImageDto;
 import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.post.PostUpdateRequest;
 import com.social_media_be.dto.user.UserSummary;
-import com.social_media_be.entity.Comment;
-import com.social_media_be.entity.Post;
-import com.social_media_be.entity.PostImage;
-import com.social_media_be.entity.User;
+import com.social_media_be.entity.*;
 import com.social_media_be.entity.enums.FriendStatus;
 import com.social_media_be.entity.enums.NotificationType;
 import com.social_media_be.entity.enums.Privacy;
 import com.social_media_be.entity.enums.TargetType;
+import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
@@ -46,10 +44,55 @@ public class PostServiceImpl implements PostService {
     private final NotificationService notificationService;
     private final NotificationRepository notificationRepository;
     private final CommentRepository commentRepository;
+    private final PostReportRepository postReportRepository;
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private Privacy normalizeUserRequestedPrivacyForCreate(Privacy requestedPrivacy) {
+        if (requestedPrivacy == null || requestedPrivacy == Privacy.HIDDEN) {
+            return Privacy.PUBLIC;
+        }
+        return requestedPrivacy;
+    }
+
+    private Privacy normalizeUserRequestedPrivacyForUpdate(Privacy currentPrivacy, Privacy requestedPrivacy) {
+        if (requestedPrivacy == null || requestedPrivacy == Privacy.HIDDEN) {
+            return currentPrivacy;
+        }
+        if (currentPrivacy == Privacy.HIDDEN) {
+            return Privacy.HIDDEN;
+        }
+        return requestedPrivacy;
+    }
+
+    private void validateVisiblePostAccess(Post post, Long currentUserId) {
+        if (post.getPrivacy() == Privacy.HIDDEN) {
+            throw new ResourceNotFoundException("Post not found");
+        }
+
+        Long postOwnerId = post.getUser().getId();
+        if (currentUserId != null && postOwnerId.equals(currentUserId)) {
+            return;
+        }
+
+        if (post.getPrivacy() == Privacy.PUBLIC) {
+            return;
+        }
+
+        if (post.getPrivacy() == Privacy.ONLY_ME) {
+            throw new ResourceNotFoundException("Post not found");
+        }
+
+        if (post.getPrivacy() == Privacy.FRIEND_ONLY) {
+            boolean isFriend = currentUserId != null
+                    && friendshipRepository.existsByUsersAndStatus(currentUserId, postOwnerId, FriendStatus.ACCEPTED);
+            if (!isFriend) {
+                throw new ResourceNotFoundException("Post not found");
+            }
+        }
     }
 
     private PostResponse mapToResponse(Post post, Long currentUserId) {
@@ -93,13 +136,13 @@ public class PostServiceImpl implements PostService {
 
     @Override
     @Transactional
-    public PostResponse createPost(PostCreateRequest request, Long userId){
+    public PostResponse createPost(PostCreateRequest request, Long userId) {
         User user = getUserById(userId);
 
         Post post = Post.builder()
                 .user(user)
                 .content(request.getContent())
-                .privacy(request.getPrivacy() != null ? request.getPrivacy() : Privacy.PUBLIC)
+                .privacy(normalizeUserRequestedPrivacyForCreate(request.getPrivacy()))
                 .feeling(request.getFeeling())
                 .images(new ArrayList<>())
                 .build();
@@ -108,7 +151,8 @@ public class PostServiceImpl implements PostService {
             int order = 0;
             try {
                 for (MultipartFile file : request.getImages()) {
-                    Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file, "social-media/posts");
+                    Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file,
+                            "social-media/posts");
                     String imgUrl = (String) uploadResult.get("secure_url");
                     PostImage postImage = PostImage.builder()
                             .post(post)
@@ -148,7 +192,9 @@ public class PostServiceImpl implements PostService {
         }
 
         post.setContent(request.getContent() != null ? request.getContent() : post.getContent());
-        post.setPrivacy(request.getPrivacy() != null ? request.getPrivacy() : post.getPrivacy());
+        if (request.getPrivacy() != null) {
+            post.setPrivacy(normalizeUserRequestedPrivacyForUpdate(post.getPrivacy(), request.getPrivacy()));
+        }
         post.setFeeling(request.getFeeling() != null ? request.getFeeling() : post.getFeeling());
 
         if (request.getDeletedImageIds() != null && !request.getDeletedImageIds().isEmpty()) {
@@ -158,7 +204,8 @@ public class PostServiceImpl implements PostService {
             for (PostImage img : toDelete) {
                 try {
                     String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
-                    if (publicId != null) cloudinaryService.delete(publicId);
+                    if (publicId != null)
+                        cloudinaryService.delete(publicId);
                 } catch (Exception e) {
                     log.error("Failed to delete image from Cloudinary: {}", img.getImageUrl(), e);
                 }
@@ -191,10 +238,11 @@ public class PostServiceImpl implements PostService {
         if (request.getImageOrder() != null && !request.getImageOrder().isEmpty()) {
             List<PostImage> currentImages = post.getImages();
 
-            // To track which new image is which: filter those without ID (newly added at line 171)
+            // To track which new image is which: filter those without ID (newly added at
+            // line 171)
             List<PostImage> newAddedImages = currentImages.stream()
-                .filter(img -> img.getId() == null)
-                .collect(Collectors.toList());
+                    .filter(img -> img.getId() == null)
+                    .collect(Collectors.toList());
 
             // Build the final set of images that should remain
             List<PostImage> orderedList = new ArrayList<>();
@@ -210,22 +258,25 @@ public class PostServiceImpl implements PostService {
                             img.setOrderIndex(finalI);
                             orderedList.add(img);
                         }
-                    } catch (NumberFormatException ignored) {}
+                    } catch (NumberFormatException ignored) {
+                    }
                 } else {
                     try {
                         Long id = Long.parseLong(ref);
                         currentImages.stream()
-                            .filter(img -> img.getId() != null && img.getId().equals(id))
-                            .findFirst()
-                            .ifPresent(img -> {
-                                img.setOrderIndex(finalI);
-                                orderedList.add(img);
-                            });
-                    } catch (NumberFormatException ignored) {}
+                                .filter(img -> img.getId() != null && img.getId().equals(id))
+                                .findFirst()
+                                .ifPresent(img -> {
+                                    img.setOrderIndex(finalI);
+                                    orderedList.add(img);
+                                });
+                    } catch (NumberFormatException ignored) {
+                    }
                 }
             }
 
-            // Safety check: Keep any existing images that weren't in the ordering list but weren't marked for deletion
+            // Safety check: Keep any existing images that weren't in the ordering list but
+            // weren't marked for deletion
             for (PostImage img : currentImages) {
                 if (!orderedList.contains(img)) {
                     img.setOrderIndex(orderedList.size());
@@ -236,12 +287,14 @@ public class PostServiceImpl implements PostService {
             // Robust collection update for JPA orphanRemoval
             // Instead of setImages(newList), we modify the existing managed collection
             List<PostImage> toRemove = currentImages.stream()
-                .filter(img -> !orderedList.contains(img))
-                .collect(Collectors.toList());
+                    .filter(img -> !orderedList.contains(img))
+                    .collect(Collectors.toList());
             currentImages.removeAll(toRemove);
 
-            // Add any that are in orderedList but not in currentImages (should be none because we added them all at 171)
-            // But we actually want to ensure the orderIndex is updated. The objects are the same, so it's already updated.
+            // Add any that are in orderedList but not in currentImages (should be none
+            // because we added them all at 171)
+            // But we actually want to ensure the orderIndex is updated. The objects are the
+            // same, so it's already updated.
         }
 
         Post savedPost = postRepository.save(post);
@@ -254,8 +307,8 @@ public class PostServiceImpl implements PostService {
         }
         String contentType = file.getContentType();
         if (contentType == null || (!contentType.equals("image/jpeg") &&
-                                   !contentType.equals("image/png") &&
-                                   !contentType.equals("image/webp"))) {
+                !contentType.equals("image/png") &&
+                !contentType.equals("image/webp"))) {
             throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
         }
         // Optional: check file extension too
@@ -286,7 +339,8 @@ public class PostServiceImpl implements PostService {
             if (comment.getImageUrl() != null) {
                 try {
                     String publicId = cloudinaryService.extractPublicId(comment.getImageUrl());
-                    if (publicId != null) cloudinaryService.delete(publicId);
+                    if (publicId != null)
+                        cloudinaryService.delete(publicId);
                 } catch (Exception e) {
                     log.error("Failed to delete comment image from Cloudinary: {}", comment.getImageUrl(), e);
                 }
@@ -297,7 +351,8 @@ public class PostServiceImpl implements PostService {
         for (PostImage img : post.getImages()) {
             try {
                 String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
-                if (publicId != null) cloudinaryService.delete(publicId);
+                if (publicId != null)
+                    cloudinaryService.delete(publicId);
             } catch (Exception e) {
                 log.error("Failed to delete post image from Cloudinary: {}", img.getImageUrl(), e);
             }
@@ -318,8 +373,7 @@ public class PostServiceImpl implements PostService {
         if (!commentIds.isEmpty()) {
             notificationRepository.deleteByReferenceIdInAndTypeIn(
                     commentIds,
-                    List.of(NotificationType.LIKE_COMMENT, NotificationType.REPLY_COMMENT)
-            );
+                    List.of(NotificationType.LIKE_COMMENT, NotificationType.REPLY_COMMENT));
         }
 
         // 6. Xóa dữ liệu trong DB
@@ -345,10 +399,13 @@ public class PostServiceImpl implements PostService {
             return getMyPosts(currentUserId, lastPostId, limit);
         }
 
-        boolean isFriend = currentUserId != null && friendshipRepository.existsByUsersAndStatus(currentUserId, targetUserId, FriendStatus.ACCEPTED);
-        List<Privacy> allowedPrivacies = isFriend ? List.of(Privacy.PUBLIC, Privacy.FRIEND_ONLY) : List.of(Privacy.PUBLIC);
+        boolean isFriend = currentUserId != null
+                && friendshipRepository.existsByUsersAndStatus(currentUserId, targetUserId, FriendStatus.ACCEPTED);
+        List<Privacy> allowedPrivacies = isFriend ? List.of(Privacy.PUBLIC, Privacy.FRIEND_ONLY)
+                : List.of(Privacy.PUBLIC);
 
-        List<Post> posts = postRepository.findUserPostsWithPrivacy(targetUserId, allowedPrivacies, lastPostId, pageable);
+        List<Post> posts = postRepository.findUserPostsWithPrivacy(targetUserId, allowedPrivacies, lastPostId,
+                pageable);
         return posts.stream().map(p -> mapToResponse(p, currentUserId)).collect(Collectors.toList());
     }
 
@@ -363,7 +420,36 @@ public class PostServiceImpl implements PostService {
 
     @Override
     public PostResponse getPostById(Long postId, Long currentUser) {
-        Post post = postRepository.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post id not found"));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post id not found"));
+        validateVisiblePostAccess(post, currentUser);
         return mapToResponse(post, currentUser);
+    }
+
+    @Override
+    @Transactional
+    public void reportPost(Long postId, Long userId, com.social_media_be.dto.post.PostReportRequest request) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+        User reporter = getUserById(userId);
+
+        if (post.getPrivacy() == Privacy.HIDDEN) {
+            throw new BadRequestException("Cannot report a hidden post");
+        }
+
+        if (postReportRepository.existsByReporterIdAndPostId(userId, postId)) {
+            throw new IllegalStateException("You have already reported this post");
+        }
+
+        PostReport report = PostReport.builder()
+                .post(post)
+                .reporter(reporter)
+                .reason(request.getReason())
+                .build();
+
+        postReportRepository.save(report);
+
+        post.setReportCount((post.getReportCount() != null ? post.getReportCount() : 0) + 1);
+        postRepository.save(post);
     }
 }

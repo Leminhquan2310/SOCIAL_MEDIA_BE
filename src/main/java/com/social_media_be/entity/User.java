@@ -105,6 +105,9 @@ public class User {
   @Column(name = "banned_at")
   private LocalDateTime bannedAt;
 
+  @Column(name = "registration_ip", length = 45)
+  private String registrationIp;
+
 
   @PrePersist
   protected void onCreate() {
