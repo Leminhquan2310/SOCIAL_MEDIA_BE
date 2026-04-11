@@ -1,9 +1,11 @@
 package com.social_media_be.service.implement;
 
+import com.social_media_be.dto.admin.AdminReportStatsDto;
 import com.social_media_be.dto.admin.NewUserStatDto;
 import com.social_media_be.dto.admin.VisitStatDto;
 import com.social_media_be.entity.AppAccessStat;
 import com.social_media_be.repository.AppAccessStatRepository;
+import com.social_media_be.repository.PostReportRepository;
 import com.social_media_be.repository.UserRepository;
 import com.social_media_be.service.AdminStatsService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ public class AdminStatsServiceImpl implements AdminStatsService {
 
     private final AppAccessStatRepository accessStatRepository;
     private final UserRepository userRepository;
+    private final PostReportRepository postReportRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -50,6 +53,17 @@ public class AdminStatsServiceImpl implements AdminStatsService {
         }
 
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminReportStatsDto getReportStats() {
+        long totalReportCount = postReportRepository.count();
+        long totalReportedPosts = postReportRepository.countDistinctPostIds();
+        return AdminReportStatsDto.builder()
+                .totalReportCount(totalReportCount)
+                .totalReportedPosts(totalReportedPosts)
+                .build();
     }
 
     @Override
