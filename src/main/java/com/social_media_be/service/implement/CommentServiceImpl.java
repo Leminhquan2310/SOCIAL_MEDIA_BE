@@ -17,6 +17,7 @@ import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
 import com.social_media_be.service.CommentRateLimiter;
 import com.social_media_be.service.CommentService;
+import com.social_media_be.service.ContentModerationService;
 import com.social_media_be.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -43,6 +44,7 @@ public class CommentServiceImpl implements CommentService {
     private final CloudinaryService cloudinaryService;
     private final NotificationRepository notificationRepository;
     private final CommentRateLimiter commentRateLimiter;
+    private final ContentModerationService contentModerationService;
 
     @Override
     @Transactional
@@ -59,6 +61,7 @@ public class CommentServiceImpl implements CommentService {
 
         // Check Privacy
         validateCommentPermission(post, user);
+        contentModerationService.validateContent(request.getContent(), "Comment contains restricted words");
 
         Comment parentComment = null;
         if (request.getParentCommentId() != null) {
