@@ -14,6 +14,7 @@ import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.*;
 import com.social_media_be.service.CloudinaryService;
+import com.social_media_be.service.ContentModerationService;
 import com.social_media_be.service.NotificationService;
 import com.social_media_be.service.PostService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class PostServiceImpl implements PostService {
     private final NotificationRepository notificationRepository;
     private final CommentRepository commentRepository;
     private final PostReportRepository postReportRepository;
+    private final ContentModerationService contentModerationService;
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
@@ -137,6 +139,7 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional
     public PostResponse createPost(PostCreateRequest request, Long userId) {
+        contentModerationService.validateContent(request.getContent());
         User user = getUserById(userId);
 
         Post post = Post.builder()
@@ -189,6 +192,10 @@ public class PostServiceImpl implements PostService {
 
         if (!post.getUser().getId().equals(user.getId())) {
             throw new AccessDeniedException("You don't have permission to edit this post");
+        }
+
+        if (request.getContent() != null) {
+            contentModerationService.validateContent(request.getContent());
         }
 
         post.setContent(request.getContent() != null ? request.getContent() : post.getContent());

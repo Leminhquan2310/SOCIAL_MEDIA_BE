@@ -1,6 +1,7 @@
 package com.social_media_be.exception;
 
 
+import com.social_media_be.exception.ContentViolationException;
 import com.social_media_be.utils.ApiResponse;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.MalformedJwtException;
@@ -242,6 +243,31 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
+     * Handle ContentViolationException (Custom)
+     */
+    @ExceptionHandler(ContentViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleContentViolationException(
+            ContentViolationException ex,
+            HttpServletRequest request) {
+
+        log.warn("ContentViolationException: {} - URI: {}", ex.getMessage(), request.getRequestURI());
+
+        Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("timestamp", LocalDateTime.now());
+        errorDetails.put("path", request.getRequestURI());
+        errorDetails.put("message", ex.getMessage());
+        errorDetails.put("matches", ex.getMatches());
+
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.BAD_REQUEST.value())
+                .message("CONTENT_VIOLATION")
+                .data(errorDetails)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**
