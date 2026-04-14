@@ -18,12 +18,15 @@ import com.social_media_be.service.CloudinaryService;
 import com.social_media_be.service.CommentRateLimiter;
 import com.social_media_be.service.CommentService;
 import com.social_media_be.service.ContentModerationService;
-import com.social_media_be.service.NotificationService;
+import com.social_media_be.entity.enums.*;
+import com.social_media_be.service.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -32,6 +35,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
@@ -71,13 +75,35 @@ public class CommentServiceImpl implements CommentService {
                 throw new BadRequestException("Mã bình luận cha không thuộc bài viết này");
             }
         }
-        Map<String, Object> uploadResult = null;
-        if (request.getImage() != null) {
+        String mediaUrl = null;
+        MediaType mediaType = MediaType.IMAGE;
+        double violationScore = 0.0;
+        MediaStatus status = MediaStatus.ACTIVE;
+
+        MultipartFile mediaFile = request.getVideo() != null ? request.getVideo() : request.getImage();
+        if (mediaFile != null) {
             try {
-                uploadResult = (Map<String, Object>) cloudinaryService.upload(request.getImage(), "social-media/comments");
+                MediaType type = request.getVideo() != null ? MediaType.VIDEO : MediaType.IMAGE;
+                String resourceType = type == MediaType.VIDEO ? "video" : "image";
+                
+                // Validate size for video
+                if (type == MediaType.VIDEO && mediaFile.getSize() > 100 * 1024 * 1024) {
+                    throw new BadRequestException("Video size exceeds 100MB limit.");
+                }
+
+                Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(mediaFile, "social-media/comments", resourceType, true);
+                mediaUrl = (String) uploadResult.get("secure_url");
+                mediaType = type;
+                violationScore = extractViolationScore(uploadResult);
+                
+                if (violationScore >= 0.8) {
+                    status = MediaStatus.REJECTED;
+                } else if (violationScore >= 0.5) {
+                    status = MediaStatus.FLAGGED;
+                }
             } catch (IOException e) {
-                e.printStackTrace();
-                throw new BadRequestException("Upload image failed!");
+                log.error("Upload media failed!", e);
+                throw new BadRequestException("Upload media failed!");
             }
         }
 
@@ -96,7 +122,10 @@ public class CommentServiceImpl implements CommentService {
                 .post(post)
                 .user(user)
                 .content(request.getContent())
-                .imageUrl(uploadResult != null ? (String) uploadResult.get("secure_url") : null)
+                .mediaUrl(mediaUrl)
+                .mediaType(mediaType)
+                .violationScore(violationScore)
+                .status(status)
                 .parentComment(actualParent)
                 .replyToUser(replyToUser)
                 .build();
@@ -163,14 +192,14 @@ public class CommentServiceImpl implements CommentService {
         targetIdsToDelete.add(commentId);
 
         List<String> imageUrlsToDelete = new java.util.ArrayList<>();
-        if (comment.getImageUrl() != null) imageUrlsToDelete.add(comment.getImageUrl());
+        if (comment.getMediaUrl() != null) imageUrlsToDelete.add(comment.getMediaUrl());
 
         if (comment.getParentComment() == null) {
             // Nếu là comment gốc: lấy danh sách replies để dọn dẹp
             List<Comment> replies = commentRepository.findByParentCommentIdOrderByCreatedAtAsc(commentId);
             for (Comment reply : replies) {
                 targetIdsToDelete.add(reply.getId());
-                if (reply.getImageUrl() != null) imageUrlsToDelete.add(reply.getImageUrl());
+                if (reply.getMediaUrl() != null) imageUrlsToDelete.add(reply.getMediaUrl());
             }
             commentsToRemove += replies.size();
         } else {
@@ -182,10 +211,11 @@ public class CommentServiceImpl implements CommentService {
         for (String url : imageUrlsToDelete) {
             try {
                 String publicId = cloudinaryService.extractPublicId(url);
-                cloudinaryService.delete(publicId);
+                if (publicId != null) {
+                    cloudinaryService.delete(publicId);
+                }
             } catch (Exception e) {
-                // Log and continue, avoid failing the whole transaction if image delete fails
-                System.err.println("Failed to delete image from Cloudinary: " + url);
+                log.error("Failed to delete media from Cloudinary: {}", url, e);
             }
         }
 
@@ -285,7 +315,9 @@ public class CommentServiceImpl implements CommentService {
                 .authorUsername(comment.getUser().getUsername())
                 .authorAvatar(comment.getUser().getAvatarUrl())
                 .content(comment.getContent())
-                .imageUrl(comment.getImageUrl())
+                .mediaUrl(comment.getStatus() == MediaStatus.ACTIVE ? comment.getMediaUrl() : null) // Hide non-active media
+                .mediaType(comment.getMediaType())
+                .mediaStatus(comment.getStatus()) // Added status to DTO for admin/frontend awareness
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .parentCommentId(comment.getReplyToUser() != null ? comment.getReplyToUser().getId() : null)
@@ -296,5 +328,41 @@ public class CommentServiceImpl implements CommentService {
                 .replyCount(comment.getReplyCount())
                 .edited(comment.isEdited())
                 .build();
+    }
+
+    private double extractViolationScore(Map<String, Object> uploadResult) {
+        try {
+            List<Map<String, Object>> moderation = (List<Map<String, Object>>) uploadResult.get("moderation");
+            if (moderation == null || moderation.isEmpty()) return 0.0;
+
+            for (Map<String, Object> mod : moderation) {
+                if ("aws_rek".equals(mod.get("kind")) || "google_vision".equals(mod.get("kind"))) {
+                    Map<String, Object> response = (Map<String, Object>) mod.get("response");
+                    if (response == null) continue;
+
+                    List<Map<String, Object>> labels = (List<Map<String, Object>>) response.get("ModerationLabels");
+                    if (labels == null) {
+                        labels = (List<Map<String, Object>>) response.get("moderation_labels");
+                    }
+                    if (labels == null) {
+                        labels = (List<Map<String, Object>>) response.get("labels");
+                    }
+
+                    if (labels != null) {
+                        return labels.stream()
+                                .mapToDouble(l -> {
+                                    Object confidence = l.get("Confidence");
+                                    if (confidence == null) confidence = l.get("confidence");
+                                    if (confidence instanceof Number) return ((Number) confidence).doubleValue() / 100.0;
+                                    return 0.0;
+                                })
+                                .max().orElse(0.0);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // log warn via syserr or similar if log not available
+        }
+        return 0.0;
     }
 }

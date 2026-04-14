@@ -10,6 +10,7 @@ public class CommentRequestDto {
     private String content;
 
     private MultipartFile image;
+    private MultipartFile video;
 
     private Long parentCommentId;
 }

@@ -164,7 +164,8 @@ public class AdminPostServiceImpl implements AdminPostService {
     private PostImageDto mapToPostImageDto(PostImage image) {
         return PostImageDto.builder()
                 .id(image.getId())
-                .imageUrl(image.getImageUrl())
+                .mediaUrl(image.getMediaUrl())
+                .mediaType(image.getMediaType())
                 .orderIndex(image.getOrderIndex())
                 .build();
     }

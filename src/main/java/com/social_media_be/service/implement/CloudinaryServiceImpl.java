@@ -18,7 +18,36 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
     @Override
     public Map upload(MultipartFile file, String folder) throws IOException {
-        return cloudinary.uploader().upload(file.getBytes(), ObjectUtils.asMap("folder", folder));
+        return upload(file, folder, "auto", false);
+    }
+
+    @Override
+    public Map upload(MultipartFile file, String folder, String resourceType, boolean moderate) throws IOException {
+        Map params = ObjectUtils.asMap(
+                "folder", folder,
+                "resource_type", resourceType
+        );
+        if (moderate) {
+            params.put("moderation", "aws_rek");
+        }
+        Map uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
+
+        // Option B: Force approve on Cloudinary side to ensure URL is always accessible for Admin review.
+        // Our backend will still use the moderation labels from uploadResult to handle internal visibility.
+        if (moderate && uploadResult.containsKey("public_id")) {
+            try {
+                String publicId = (String) uploadResult.get("public_id");
+                cloudinary.api().update(publicId, ObjectUtils.asMap(
+                        "moderation_status", "approved",
+                        "resource_type", resourceType
+                ));
+            } catch (Exception e) {
+                // Log and continue - we don't want to fail the upload if force-approval fails
+                System.err.println("Failed to force-approve moderated content: " + e.getMessage());
+            }
+        }
+
+        return uploadResult;
     }
 
     @Override
