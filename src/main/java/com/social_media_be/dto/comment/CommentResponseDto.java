@@ -1,5 +1,6 @@
 package com.social_media_be.dto.comment;
 
+import com.social_media_be.entity.enums.MediaType;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,7 +18,8 @@ public class CommentResponseDto {
     private String authorAvatar;
     
     private String content;
-    private String imageUrl;
+    private String mediaUrl;
+    private MediaType mediaType;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
@@ -30,4 +32,5 @@ public class CommentResponseDto {
     private boolean isLiked;
     private long replyCount;
     private boolean edited;
+    private com.social_media_be.entity.enums.MediaStatus mediaStatus;
 }

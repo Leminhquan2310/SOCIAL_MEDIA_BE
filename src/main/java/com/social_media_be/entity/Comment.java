@@ -1,5 +1,7 @@
 package com.social_media_be.entity;
 
+import com.social_media_be.entity.enums.MediaStatus;
+import com.social_media_be.entity.enums.MediaType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,8 +32,22 @@ public class Comment {
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
+    @Column(name = "media_url", length = 500)
+    private String mediaUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "media_type")
+    @Builder.Default
+    private MediaType mediaType = MediaType.IMAGE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    @Builder.Default
+    private MediaStatus status = MediaStatus.ACTIVE;
+
+    @Column(name = "violation_score")
+    @Builder.Default
+    private Double violationScore = 0.0;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reply_to_user_id")

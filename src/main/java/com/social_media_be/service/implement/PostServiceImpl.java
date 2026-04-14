@@ -6,10 +6,7 @@ import com.social_media_be.dto.post.PostResponse;
 import com.social_media_be.dto.post.PostUpdateRequest;
 import com.social_media_be.dto.user.UserSummary;
 import com.social_media_be.entity.*;
-import com.social_media_be.entity.enums.FriendStatus;
-import com.social_media_be.entity.enums.NotificationType;
-import com.social_media_be.entity.enums.Privacy;
-import com.social_media_be.entity.enums.TargetType;
+import com.social_media_be.entity.enums.*;
 import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.repository.*;
@@ -47,6 +44,14 @@ public class PostServiceImpl implements PostService {
     private final CommentRepository commentRepository;
     private final PostReportRepository postReportRepository;
     private final ContentModerationService contentModerationService;
+    private static final List<String> VIOLATION_KEYWORDS = List.of(
+            "nudity",
+            "explicit",
+            "sexual",
+            "violence",
+            "weapon",
+            "blood"
+    );
 
     private User getUserById(Long userId) {
         return userRepository.findById(userId)
@@ -106,6 +111,7 @@ public class PostServiceImpl implements PostService {
                 .build();
 
         List<PostImageDto> imageDtos = post.getImages().stream()
+                .filter(img -> img.getStatus() == MediaStatus.ACTIVE)
                 .sorted((a, b) -> {
                     int idxA = a.getOrderIndex() != null ? a.getOrderIndex() : 0;
                     int idxB = b.getOrderIndex() != null ? b.getOrderIndex() : 0;
@@ -113,8 +119,10 @@ public class PostServiceImpl implements PostService {
                 })
                 .map(img -> PostImageDto.builder()
                         .id(img.getId())
-                        .imageUrl(img.getImageUrl())
+                        .mediaUrl(img.getMediaUrl())
+                        .mediaType(img.getMediaType())
                         .orderIndex(img.getOrderIndex())
+                        .status(img.getStatus()) // Added status for potential frontend usage
                         .build())
                 .collect(Collectors.toList());
 
@@ -150,28 +158,134 @@ public class PostServiceImpl implements PostService {
                 .images(new ArrayList<>())
                 .build();
 
+        int order = 0;
+        // Process Images
         if (request.getImages() != null && !request.getImages().isEmpty()) {
-            int order = 0;
-            try {
-                for (MultipartFile file : request.getImages()) {
-                    Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file,
-                            "social-media/posts");
-                    String imgUrl = (String) uploadResult.get("secure_url");
-                    PostImage postImage = PostImage.builder()
-                            .post(post)
-                            .imageUrl(imgUrl)
-                            .orderIndex(order++)
-                            .build();
-                    post.getImages().add(postImage);
-                }
-            } catch (IOException ioe) {
-                log.error("Can not upload file!");
-                ioe.printStackTrace();
+            for (MultipartFile file : request.getImages()) {
+                processMediaUpload(post, file, MediaType.IMAGE, order++);
+            }
+        }
+
+        // Process Videos
+        if (request.getVideos() != null && !request.getVideos().isEmpty()) {
+            for (MultipartFile file : request.getVideos()) {
+                processMediaUpload(post, file, MediaType.VIDEO, order++);
             }
         }
 
         Post savedPost = postRepository.save(post);
         return mapToResponse(savedPost, userId);
+    }
+
+    private void processMediaUpload(Post post, MultipartFile file, MediaType type, int order) {
+        try {
+            String resourceType = type == MediaType.VIDEO ? "video" : "image";
+            Map<String, Object> uploadResult = (Map<String, Object>) cloudinaryService.upload(file,
+                    "social-media/posts", resourceType, true);
+
+            String mediaUrl = (String) uploadResult.get("secure_url");
+            double violationScore = extractViolationScore(uploadResult);
+            
+            MediaStatus status = MediaStatus.ACTIVE;
+            if (violationScore >= 0.8) {
+                status = MediaStatus.REJECTED;
+            } else if (violationScore >= 0.5) {
+                status = MediaStatus.FLAGGED;
+            }
+
+            PostImage postMedia = PostImage.builder()
+                    .post(post)
+                    .mediaUrl(mediaUrl)
+                    .mediaType(type)
+                    .orderIndex(order)
+                    .violationScore(violationScore)
+                    .status(status)
+                    .build();
+
+            post.getImages().add(postMedia);
+        } catch (IOException ioe) {
+            log.error("Cannot upload {} to Cloudinary!", type, ioe);
+            throw new RuntimeException("Upload failed: " + file.getOriginalFilename());
+        }
+    }
+
+    private double extractViolationScore(Map<String, Object> uploadResult) {
+        try {
+            List<Map<String, Object>> moderation = (List<Map<String, Object>>) uploadResult.get("moderation");
+
+            if (moderation == null || moderation.isEmpty()) return 0.0;
+
+            double maxViolationScore = 0.0;
+            double maxFallbackScore = 0.0;
+
+            for (Map<String, Object> mod : moderation) {
+
+                String kind = (String) mod.get("kind");
+                if (!"aws_rek".equals(kind) && !"google_vision".equals(kind)) continue;
+
+                Map<String, Object> response = (Map<String, Object>) mod.get("response");
+
+                if (response == null) continue;
+
+                // AWS Rekognition
+                List<Map<String, Object>> labels = (List<Map<String, Object>>) response.get("moderation_labels");
+
+                // fallback Google Vision or other format
+                if (labels == null) {
+                    labels = (List<Map<String, Object>>) response.get("labels");
+                }
+                
+                // Cloudinary documentation sometimes uses "ModerationLabels" capitalization
+                if (labels == null) {
+                    labels = (List<Map<String, Object>>) response.get("ModerationLabels");
+                }
+
+                if (labels == null) continue;
+
+                for (Map<String, Object> label : labels) {
+
+                    String name = (String) label.get("name");
+                    Object confidenceObj = label.get("confidence");
+
+                    if (!(confidenceObj instanceof Number)) continue;
+
+                    double confidence = ((Number) confidenceObj).doubleValue() / 100.0;
+
+                    // 👉 log để debug + học dữ liệu thật
+                    log.debug("AI label: {}, confidence: {}", name, confidence);
+
+                    if (name == null) continue;
+
+                    String lower = name.toLowerCase();
+
+                    // 🔥 Rule chính: match keyword nguy hiểm
+                    boolean isViolation = VIOLATION_KEYWORDS.stream()
+                            .anyMatch(lower::contains);
+
+                    if (isViolation) {
+                        maxViolationScore = Math.max(maxViolationScore, confidence);
+                    }
+
+                    // 🔥 fallback: lưu max tất cả label
+                    maxFallbackScore = Math.max(maxFallbackScore, confidence);
+                }
+            }
+
+            // 🎯 ưu tiên score từ label nguy hiểm
+            if (maxViolationScore > 0) {
+                return maxViolationScore;
+            }
+
+            // 🎯 fallback nếu không match label nhưng score rất cao
+            if (maxFallbackScore > 0.9) {
+                return maxFallbackScore;
+            }
+
+        } catch (Exception e) {
+            log.warn("Failed to extract violation score from moderation response", e);
+        }
+
+        return 0.0;
     }
 
     @Override
@@ -210,35 +324,32 @@ public class PostServiceImpl implements PostService {
                     .collect(Collectors.toList());
             for (PostImage img : toDelete) {
                 try {
-                    String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
+                    String publicId = cloudinaryService.extractPublicId(img.getMediaUrl());
                     if (publicId != null)
                         cloudinaryService.delete(publicId);
                 } catch (Exception e) {
-                    log.error("Failed to delete image from Cloudinary: {}", img.getImageUrl(), e);
+                    log.error("Failed to delete media from Cloudinary: {}", img.getMediaUrl(), e);
                 }
                 post.getImages().remove(img);
             }
         }
 
+        int currentMaxOrder = post.getImages().stream()
+                .mapToInt(img -> img.getOrderIndex() != null ? img.getOrderIndex() : 0)
+                .max().orElse(-1);
+
         if (request.getNewImages() != null && !request.getNewImages().isEmpty()) {
-            List<PostImage> newlyUploaded = new ArrayList<>();
             for (MultipartFile file : request.getNewImages()) {
-                validateImage(file);
-                try {
-                    Map<?, ?> uploadResult = cloudinaryService.upload(file, "social-media/posts");
-                    String imgUrl = (String) uploadResult.get("secure_url");
-                    PostImage postImage = PostImage.builder()
-                            .post(post)
-                            .imageUrl(imgUrl)
-                            .orderIndex(0) // Will be updated by reordering logic
-                            .build();
-                    newlyUploaded.add(postImage);
-                } catch (IOException ioe) {
-                    log.error("Can not upload file!");
-                    throw new RuntimeException("Failed to upload image", ioe);
-                }
+                validateMedia(file, MediaType.IMAGE);
+                processMediaUpload(post, file, MediaType.IMAGE, ++currentMaxOrder);
             }
-            post.getImages().addAll(newlyUploaded);
+        }
+
+        if (request.getNewVideos() != null && !request.getNewVideos().isEmpty()) {
+            for (MultipartFile file : request.getNewVideos()) {
+                validateMedia(file, MediaType.VIDEO);
+                processMediaUpload(post, file, MediaType.VIDEO, ++currentMaxOrder);
+            }
         }
 
         // Handle Reordering and New Image Integration
@@ -308,20 +419,24 @@ public class PostServiceImpl implements PostService {
         return mapToResponse(savedPost, userId);
     }
 
-    private void validateImage(MultipartFile file) {
+    private void validateMedia(MultipartFile file, MediaType type) {
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("Image file is empty");
+            throw new IllegalArgumentException(type + " file is empty");
         }
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("image/jpeg") &&
-                !contentType.equals("image/png") &&
-                !contentType.equals("image/webp"))) {
-            throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
-        }
-        // Optional: check file extension too
-        String filename = file.getOriginalFilename();
-        if (filename == null || !filename.matches("(?i).*\\.(jpg|jpeg|png|webp)$")) {
-            throw new IllegalArgumentException("Invalid image file extension.");
+        if (type == MediaType.IMAGE) {
+            if (contentType == null || (!contentType.equals("image/jpeg") &&
+                    !contentType.equals("image/png") &&
+                    !contentType.equals("image/webp"))) {
+                throw new IllegalArgumentException("Invalid image format. Only JPG, PNG, and WEBP are allowed.");
+            }
+        } else {
+            if (contentType == null || (!contentType.startsWith("video/"))) {
+                throw new IllegalArgumentException("Invalid video format.");
+            }
+            if (file.getSize() > 100 * 1024 * 1024) {
+                throw new IllegalArgumentException("Video size exceeds 100MB limit.");
+            }
         }
     }
 
@@ -343,13 +458,13 @@ public class PostServiceImpl implements PostService {
 
         // 2. Xóa ảnh của các comment trên Cloudinary
         for (Comment comment : comments) {
-            if (comment.getImageUrl() != null) {
+            if (comment.getMediaUrl() != null) {
                 try {
-                    String publicId = cloudinaryService.extractPublicId(comment.getImageUrl());
+                    String publicId = cloudinaryService.extractPublicId(comment.getMediaUrl());
                     if (publicId != null)
                         cloudinaryService.delete(publicId);
                 } catch (Exception e) {
-                    log.error("Failed to delete comment image from Cloudinary: {}", comment.getImageUrl(), e);
+                    log.error("Failed to delete comment media from Cloudinary: {}", comment.getMediaUrl(), e);
                 }
             }
         }
@@ -357,11 +472,11 @@ public class PostServiceImpl implements PostService {
         // 3. Xóa ảnh của bài viết trên Cloudinary
         for (PostImage img : post.getImages()) {
             try {
-                String publicId = cloudinaryService.extractPublicId(img.getImageUrl());
+                String publicId = cloudinaryService.extractPublicId(img.getMediaUrl());
                 if (publicId != null)
                     cloudinaryService.delete(publicId);
             } catch (Exception e) {
-                log.error("Failed to delete post image from Cloudinary: {}", img.getImageUrl(), e);
+                log.error("Failed to delete post media from Cloudinary: {}", img.getMediaUrl(), e);
             }
         }
 

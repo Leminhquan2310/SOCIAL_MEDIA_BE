@@ -13,4 +13,5 @@ public class PostCreateRequest {
     private Privacy privacy;
     private String feeling;
     private List<MultipartFile> images = new ArrayList<>();
+    private List<MultipartFile> videos = new ArrayList<>();
 }
