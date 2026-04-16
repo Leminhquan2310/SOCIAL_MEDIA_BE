@@ -1,14 +1,16 @@
 package com.social_media_be.entity;
 
+import com.social_media_be.entity.enums.MemberRole;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "conversation_members", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"conversation_id", "user_id"})
-})
+@Table(name = "conversation_members",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"conversation_id", "user_id"})
+       })
 @Getter
 @Setter
 @Builder
@@ -27,11 +29,16 @@ public class ConversationMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "joined_at", nullable = false, updatable = false)
-    private LocalDateTime joinedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    @Builder.Default
+    private MemberRole role = MemberRole.MEMBER;
 
-    @PrePersist
-    protected void onCreate() {
-        joinedAt = LocalDateTime.now();
-    }
+    @Column(name = "unread_count")
+    @Builder.Default
+    private Integer unreadCount = 0;
+
+    @Column(name = "joined_at")
+    @Builder.Default
+    private LocalDateTime joinedAt = LocalDateTime.now();
 }
