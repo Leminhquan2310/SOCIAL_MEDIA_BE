@@ -1,9 +1,12 @@
 package com.social_media_be.entity;
 
+import com.social_media_be.entity.enums.ConversationType;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "conversations")
@@ -17,27 +20,35 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name", length = 100)
-    private String name;
-
-    @Column(name = "is_group", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
     @Builder.Default
-    private boolean isGroup = false;
+    private ConversationType type = ConversationType.PRIVATE;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "title")
+    private String title;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "last_message", columnDefinition = "TEXT")
+    private String lastMessage;
+
+    @Column(name = "last_sender_id")
+    private Long lastSenderId;
+
+    @Column(name = "last_message_at")
+    private LocalDateTime lastMessageAt;
+
+    @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<ConversationMember> members = new HashSet<>();
 
     @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        if (lastMessageAt == null) {
+            lastMessageAt = LocalDateTime.now();
+        }
     }
 }

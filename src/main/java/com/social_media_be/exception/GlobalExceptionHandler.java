@@ -383,6 +383,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 
+    /**
+     * Handle AccessDeniedPermissionException
+     */
+    @ExceptionHandler(AccessDeniedPermissionException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedPermissionException(
+            MaxUploadSizeExceededException ex,
+            HttpServletRequest request) {
+
+        log.error("AccessDeniedPermission: {} - URI: {}", ex.getMessage(), request.getRequestURI());
+
+        ApiResponse<Object> response = ApiResponse.builder()
+                .code(HttpStatus.FORBIDDEN.value())
+                .message("FORBIDDEN")
+                .data(ex.getMessage())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
     // ========== Helper Methods ==========
 
     /**
