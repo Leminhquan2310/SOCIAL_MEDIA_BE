@@ -18,4 +18,5 @@ public interface ChatService {
     Page<MessageDto> getMessages(Long conversationId, Long userId, Pageable pageable);
     void markAsSeen(Long conversationId, Long userId);
     Long getTotalUnreadCount(Long userId);
+    ConversationResponseDto getOrCreateConversation(Long userId, Long receiverId);
 }

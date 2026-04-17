@@ -8,6 +8,7 @@ import com.social_media_be.entity.UserPrincipal;
 import com.social_media_be.entity.enums.DisplayFriendsStatus;
 import com.social_media_be.entity.enums.FriendStatus;
 import com.social_media_be.entity.enums.NotificationType;
+import com.social_media_be.exception.AccessDeniedPermissionException;
 import com.social_media_be.exception.BadRequestException;
 import com.social_media_be.exception.ResourceNotFoundException;
 import com.social_media_be.exception.UnauthorizedException;
@@ -19,11 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.swing.text.html.Option;
 import java.util.Optional;
 
 @Slf4j
@@ -72,15 +71,17 @@ public class FriendServiceImpl implements FriendService {
                 .map(u -> mapToFriendUserDTO(u, user.get().getId()));
 
         boolean isOwner = user.get().getId().equals(uPrincipal.getId());
-        if (!isOwner) {
+        if (!isOwner && user.get().getDisplayFriendsStatus() != DisplayFriendsStatus.PUBLIC) {
             if (user.get().getDisplayFriendsStatus() == DisplayFriendsStatus.ONLY_ME)
-                throw new AccessDeniedException("This profile is private");
+                throw new AccessDeniedPermissionException("This profile is private");
 
             Friendship friendship = friendshipRepository.findFriendshipBetween(uPrincipal.getId(), user.get().getId())
-                    .orElseThrow(() -> new AccessDeniedException("This profile is private"));
-            if (user.get().getDisplayFriendsStatus() == DisplayFriendsStatus.FRIEND_ONLY
-                    && friendship.getStatus() != FriendStatus.ACCEPTED)
-                throw new AccessDeniedException("This profile is private");
+                    .orElseThrow(() -> new AccessDeniedPermissionException("This profile is private"));
+
+            boolean isFriendAndEnoughPermission = user.get().getDisplayFriendsStatus() == DisplayFriendsStatus.FRIEND_ONLY
+                    && friendship.getStatus() != FriendStatus.ACCEPTED;
+            if (isFriendAndEnoughPermission)
+                throw new AccessDeniedPermissionException("This profile is private");
 
         }
         return result;

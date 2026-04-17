@@ -188,6 +188,43 @@ public class ChatServiceImpl implements ChatService {
         return count != null ? count : 0L;
     }
 
+    @Override
+    @Transactional
+    public ConversationResponseDto getOrCreateConversation(Long userId, Long receiverId) {
+        User sender = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+
+        Conversation conversation = conversationRepository.findPrivateBetweenUsers(sender, receiver)
+                .orElseGet(() -> {
+                    Conversation newConv = Conversation.builder()
+                            .type(ConversationType.PRIVATE)
+                            .build();
+                    Conversation savedConv = conversationRepository.save(newConv);
+
+                    ConversationMember member1 = ConversationMember.builder()
+                            .conversation(savedConv)
+                            .user(sender)
+                            .role(MemberRole.MEMBER)
+                            .unreadCount(0)
+                            .build();
+                    ConversationMember member2 = ConversationMember.builder()
+                            .conversation(savedConv)
+                            .user(receiver)
+                            .role(MemberRole.MEMBER)
+                            .unreadCount(0)
+                            .build();
+
+                    conversationMemberRepository.save(member1);
+                    conversationMemberRepository.save(member2);
+
+                    return savedConv;
+                });
+
+        return mapToConversationResponseDto(conversation, sender);
+    }
+
     private MessageDto mapToMessageDto(Message message) {
         return MessageDto.builder()
                 .id(message.getId())

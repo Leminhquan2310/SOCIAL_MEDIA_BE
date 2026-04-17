@@ -70,6 +70,27 @@ public class ChatController {
             @PathVariable Long conversationId,
             @AuthenticationPrincipal UserPrincipal currentUser) {
         chatService.markAsSeen(conversationId, currentUser.getId());
+
+        // Broadcast "Seen" status to other members
+        java.util.List<User> members = chatService.getConversationMembers(conversationId);
+        java.util.Map<String, Object> statusUpdate = new java.util.HashMap<>();
+        statusUpdate.put("type", "CHAT_STATUS");
+        statusUpdate.put("conversationId", conversationId);
+        statusUpdate.put("userId", currentUser.getId());
+        statusUpdate.put("status", "SEEN");
+        statusUpdate.put("seenAt", java.time.LocalDateTime.now().toString());
+
+        for (User member : members) {
+            // No need to notify the person who just marked it as seen (though it doesn't hurt)
+            if (!member.getId().equals(currentUser.getId())) {
+                messagingTemplate.convertAndSendToUser(
+                        member.getUsername(),
+                        "/queue/messages",
+                        statusUpdate
+                );
+            }
+        }
+
         return ResponseEntity.ok().build();
     }
 
@@ -77,5 +98,12 @@ public class ChatController {
     public ResponseEntity<?> getUnreadCount(
             @AuthenticationPrincipal UserPrincipal currentUser) {
         return ResponseEntity.ok(ApiResponse.success(chatService.getTotalUnreadCount(currentUser.getId())));
+    }
+
+    @PostMapping("/conversations/user/{receiverId}")
+    public ResponseEntity<?> getOrCreateConversation(
+            @PathVariable Long receiverId,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+        return ResponseEntity.ok(ApiResponse.success(chatService.getOrCreateConversation(currentUser.getId(), receiverId)));
     }
 }
