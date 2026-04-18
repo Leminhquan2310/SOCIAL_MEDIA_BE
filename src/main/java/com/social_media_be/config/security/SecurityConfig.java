@@ -128,6 +128,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/friends/status/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/ws-notifications/**").permitAll()
+                        .requestMatchers("/", "/health").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
