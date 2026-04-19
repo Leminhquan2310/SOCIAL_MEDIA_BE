@@ -10,6 +10,7 @@ import com.social_media_be.service.JWTService;
 import com.social_media_be.service.implement.CustomOAuth2UserService;
 import com.social_media_be.service.implement.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -48,6 +49,9 @@ public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final com.social_media_be.repository.TokenBlacklistRepository tokenBlacklistRepository;
 
+    @Value("{app.frontend-url")
+    private String FRONTEND_URL;
+
     @Bean
     public HttpCookieOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository() {
         return new HttpCookieOAuth2AuthorizationRequestRepository();
@@ -81,7 +85,7 @@ public class SecurityConfig {
 
         // Allowed origins
         configuration.setAllowedOrigins(List.of(
-                "https://localhost:3000"
+                FRONTEND_URL
         ));
 
         // Allowed methods
