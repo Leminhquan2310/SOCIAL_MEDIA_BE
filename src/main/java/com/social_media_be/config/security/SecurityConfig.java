@@ -49,7 +49,7 @@ public class SecurityConfig {
     private final CustomUserDetailsService customUserDetailsService;
     private final com.social_media_be.repository.TokenBlacklistRepository tokenBlacklistRepository;
 
-    @Value("{app.frontend-url")
+    @Value("${app.frontend-url")
     private String FRONTEND_URL;
 
     @Bean
