@@ -47,7 +47,7 @@ public class CookieUtils {
             .path("/")
             .httpOnly(true)
             .secure(true)
-            .maxAge(maxAge)
+            .maxAge(0)
             .sameSite("None") // Cho phép gửi trên cùng domain localhost:3000 -> localhost:8080
             .build();
           response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
