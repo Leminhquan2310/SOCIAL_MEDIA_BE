@@ -30,8 +30,9 @@ public class CookieUtils {
     ResponseCookie cookie = ResponseCookie.from(name, value)
       .path("/")
       .httpOnly(true)
+      .secure(true)
       .maxAge(maxAge)
-      .sameSite("Lax") // Cho phép gửi trên cùng domain localhost:3000 -> localhost:8080
+      .sameSite("None") // Cho phép gửi trên cùng domain localhost:3000 -> localhost:8080
       .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
   }
@@ -45,8 +46,9 @@ public class CookieUtils {
           ResponseCookie deleteCookie = ResponseCookie.from(name, "")
             .path("/")
             .httpOnly(true)
-            .maxAge(0)
-            .sameSite("Lax")
+            .secure(true)
+            .maxAge(maxAge)
+            .sameSite("None") // Cho phép gửi trên cùng domain localhost:3000 -> localhost:8080
             .build();
           response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
         }
